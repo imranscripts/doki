@@ -1,0 +1,247 @@
+# ============================================================================
+# PLAYWRIGHT TEMPLATE
+# ============================================================================
+# Template for running Playwright E2E tests
+# Runs in official Microsoft Playwright container with all browsers
+# ============================================================================
+
+id: playwright-test
+name: Playwright E2E Tests
+category: Testing
+description: Run automated browser tests with Playwright
+icon: fas fa-theater-masks
+color: "#2EAD33"
+
+# ----------------------------------------------------------------------------
+# RUNTIME: Official Playwright container with all dependencies
+# ----------------------------------------------------------------------------
+runtime:
+  image: mcr.microsoft.com/playwright:v1.40.0-jammy
+  workdir: /workspace
+  env:
+    - name: CI
+      value: "true"
+    - name: PLAYWRIGHT_BROWSERS_PATH
+      value: /ms-playwright
+  volumes:
+    # Mount the test project
+    - host: "${DOKI_WORKSPACE}/playwright"
+      container: /workspace
+      readonly: false
+    # Mount for artifacts output
+    - host: "${DOKI_ARTIFACTS}"
+      container: /artifacts
+      readonly: false
+  resources:
+    memory: 2g
+    cpu: "2"
+    timeout: 600  # 10 minutes max
+
+# ----------------------------------------------------------------------------
+# INPUTS
+# ----------------------------------------------------------------------------
+inputs:
+  - name: project
+    label: Test Project
+    type: select
+    required: true
+    description: Select the test project to run
+    # Options are dynamically populated by scanning workspace
+    dynamicOptions:
+      source: directory
+      path: "${DOKI_WORKSPACE}/playwright"
+      filter: "*/playwright.config.*"
+  
+  - name: testFiles
+    label: Test Files
+    type: multiselect
+    required: false
+    description: Select specific tests (leave empty for all)
+    dynamicOptions:
+      source: glob
+      path: "${DOKI_WORKSPACE}/playwright/{{project}}/tests"
+      pattern: "*.test.ts"
+  
+  - name: testName
+    label: Test Run Name
+    type: string
+    required: true
+    default: "Manual Test Run"
+    placeholder: "e.g., Smoke Test, Regression, PR-123"
+    description: Name for this test run (appears in reports)
+    validation:
+      maxLength: 100
+  
+  - name: headed
+    label: Run Headed
+    type: boolean
+    required: false
+    default: false
+    description: Run browser in headed mode (slower, for debugging)
+  
+  - name: workers
+    label: Parallel Workers
+    type: number
+    required: false
+    default: 1
+    description: Number of parallel test workers
+    validation:
+      min: 1
+      max: 4
+  
+  - name: retries
+    label: Retries on Failure
+    type: number
+    required: false
+    default: 1
+    description: Number of retries for failed tests
+    validation:
+      min: 0
+      max: 3
+  
+  - name: browser
+    label: Browser
+    type: select
+    required: false
+    default: chromium
+    options:
+      - value: chromium
+        label: Chromium (recommended)
+      - value: firefox
+        label: Firefox
+      - value: webkit
+        label: WebKit (Safari)
+
+# ----------------------------------------------------------------------------
+# EXECUTION
+# ----------------------------------------------------------------------------
+execution:
+  mode: async  # Long-running, uses polling
+  pollInterval: 2000
+  script: |
+    #!/bin/bash
+    set -e
+    
+    cd /workspace/{{project}}
+    
+    # Install dependencies if needed
+    if [ ! -d "node_modules" ]; then
+      echo "📦 Installing dependencies..."
+      npm ci --silent
+    fi
+    
+    echo "🎭 Starting Playwright tests..."
+    echo "Project: {{project}}"
+    echo "Test Name: {{testName}}"
+    echo "Browser: {{browser}}"
+    echo ""
+    
+    # Build test file arguments
+    TEST_FILES=""
+    {{#if testFiles}}
+    TEST_FILES="{{testFiles}}"
+    {{/if}}
+    
+    # Build headed flag
+    HEADED_FLAG=""
+    {{#if headed}}
+    HEADED_FLAG="--headed"
+    {{/if}}
+    
+    # Run Playwright
+    npx playwright test $TEST_FILES \
+      --project={{browser}} \
+      --workers={{workers}} \
+      --retries={{retries}} \
+      --reporter=html,line \
+      $HEADED_FLAG \
+      2>&1 | tee /artifacts/output.log
+    
+    EXIT_CODE=${PIPESTATUS[0]}
+    
+    # Copy artifacts
+    echo ""
+    echo "📁 Collecting artifacts..."
+    
+    # Copy HTML report
+    if [ -d "playwright-report" ]; then
+      cp -r playwright-report /artifacts/report
+      echo "Report available at: /artifacts/report/index.html"
+    fi
+    
+    # Copy videos
+    if [ -d "test-results" ]; then
+      find test-results -name "*.webm" -exec cp {} /artifacts/ \;
+      VIDEO=$(ls /artifacts/*.webm 2>/dev/null | head -1)
+      if [ -n "$VIDEO" ]; then
+        echo "Video available at: $VIDEO"
+      fi
+    fi
+    
+    # Write metadata
+    echo "{{testName}}" > /artifacts/testname.txt
+    echo "$EXIT_CODE" > /artifacts/exitcode.txt
+    echo "{{testFiles}}" | tr ',' '\n' | wc -l > /artifacts/testcount.txt
+    
+    if [ $EXIT_CODE -eq 0 ]; then
+      echo ""
+      echo "✅ All tests passed!"
+    else
+      echo ""
+      echo "❌ Some tests failed (exit code: $EXIT_CODE)"
+    fi
+    
+    exit $EXIT_CODE
+
+# ----------------------------------------------------------------------------
+# OUTPUT
+# ----------------------------------------------------------------------------
+output:
+  type: report
+  extractors:
+    - name: reportPath
+      pattern: "Report available at: (.+\\.html)"
+      display: link
+    - name: videoPath
+      pattern: "Video available at: (.+\\.webm)"
+      display: link
+    - name: passedCount
+      pattern: "(\\d+) passed"
+      display: badge
+    - name: failedCount
+      pattern: "(\\d+) failed"
+      display: badge
+  artifacts:
+    - name: report
+      path: /artifacts/report
+      type: html
+      retention: 30d
+    - name: video
+      path: /artifacts/*.webm
+      type: video
+      retention: 7d
+    - name: logs
+      path: /artifacts/output.log
+      type: log
+      retention: 7d
+
+# ----------------------------------------------------------------------------
+# UI
+# ----------------------------------------------------------------------------
+ui:
+  button:
+    label: Run Tests
+    icon: fas fa-play
+    style: success
+  showLiveOutput: true
+  autoRefresh:
+    enabled: false  # Uses async polling instead
+
+# ----------------------------------------------------------------------------
+# ACCESS
+# ----------------------------------------------------------------------------
+access:
+  allowedRoles: [admin, dev, qa, metier]
+  createRoles: [admin]
+  approval:
+    required: false

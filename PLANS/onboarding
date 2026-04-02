@@ -1,0 +1,103 @@
+# Onboarding scope
+
+The onboarding flow should cover only the work required to turn a fresh install into a secure, usable system.
+
+## Delivery phases
+
+### Phase 0: bootstrap foundation (`setup.sh`)
+Goal: make a fresh install safe to open in the browser and give the onboarding wizard the runtime state it needs.
+
+- Verify prerequisites: Docker access, writable `app/data`, required PHP extensions, and Go orchestrator reachability.
+- Create required runtime directories and permissions such as `app/data/config`, `app/data/keys`, `app/data/sessions`, `app/data/sources`, `app/data/playwright-runtime`, `app/data/app-build-status`, and `app/data/users`.
+- Generate `app/data/keys/secrets.key` if it is missing and enforce `0600`.
+- Generate `app/data/keys/stealth.secret` if it is missing and enforce `0600`.
+- During `setup.sh`, print the current stealth secret with an operator message such as: "Here is your stealth key. Keep it somewhere safe. You will need it after onboarding if you keep the stealth feature enabled."
+- Stop lazy request-time creation of `secrets.key` and `stealth.secret`; bootstrap owns first creation and the web app should surface a clear readiness error if they are missing later.
+- Create live config files from examples when missing, or create empty defaults where that is safer.
+- Auto-create a built-in `local` target so every fresh install has one zero-config execution target.
+- Verify the built-in `local` target and persist its verified capabilities when the runtime is healthy.
+- Initialize the SQLite schema and an install-state marker, but do not create the first human user.
+- Add dedicated onboarding metadata in SQLite for install state, bootstrap timestamps, and first-admin recovery data instead of overloading the `users` table with one-off bootstrap fields.
+- Create baseline registry files if missing, especially `app/apps/.installed.yaml` and `app/data/config/commands.yaml`.
+- For upgrades from older installs, detect whether real users already exist and mark the install as `complete` so existing deployments are not forced back through onboarding.
+- Print a health summary so the user knows whether the web onboarding can proceed.
+
+Exit criteria:
+- A fresh install has no seeded default admin.
+- The app can tell whether onboarding is ready to run and whether install state is `fresh`, `onboarding`, or `complete`.
+- The browser wizard has the keys, schema, and local target it depends on.
+- `setup.sh` has shown the current stealth secret and warned the operator to save it before proceeding.
+- Existing upgraded installs bypass onboarding safely unless explicitly reset into first-run mode.
+
+### Phase 1: secure first-run wizard (MVP)
+Goal: replace bundled credentials with a one-time setup flow that hardens the install before normal use.
+
+- Route `index.php`, `login.php`, and stealth entry behavior from install state first: `fresh` and `onboarding` go to the wizard, `complete` goes to the normal stealth/login flow.
+- Remove bundled default credentials and default credential hints entirely once onboarding exists.
+- Create the first `super-admin` account in a transaction so only one browser session can win first setup.
+- Force a strong password immediately; do not rely on bundled default credentials.
+- Generate a break-glass recovery code for the first `super-admin` during setup and store it in dedicated onboarding metadata as an operator-readable database value. This is an intentional host-access trust tradeoff, similar to other break-glass install secrets.
+- Explain what the stealth feature does, remind the admin that `setup.sh` already showed the current stealth secret, and let them keep stealth enabled or disable it.
+- Let the admin review or rotate the secrets encryption key that `setup.sh` created.
+- Add a local password recovery flow for the first `super-admin` that accepts the recovery code, applies its own rate limiting, forces a new strong password, audits both failed and successful recovery attempts, revokes all active sessions for that account, and rotates the recovery code after a successful reset.
+- Finish with a summary screen and lock the wizard so normal login/app routing starts afterward.
+
+Exit criteria:
+- Fresh installs always land in onboarding first.
+- The first real admin is created during onboarding, not from seed data.
+- A locked-out operator with database access can recover the first `super-admin` without editing password hashes by hand.
+- Every successful recovery invalidates the old code and records an audit trail.
+- Password reset or recovery revokes all existing sessions for that account.
+- The admin has been told what stealth does and has explicitly chosen whether it remains enabled after onboarding.
+- Completing the wizard exits first-run mode and enables normal login behavior.
+
+### Phase 2: quick-start usability
+Goal: ensure the first admin can use Doki immediately after onboarding without hunting through settings.
+
+- Show the pre-created `local` target as ready to use and allow the user to rename/edit it later in normal settings.
+- Choose which major modules/apps start enabled: Commands, Apps, Sources, Playwright, utility apps.
+- If Commands is enabled, seed one safe starter command bound to the `local` target so the user can run something immediately after onboarding.
+- Set exec targets for Docker-backed apps if those apps are enabled.
+
+Exit criteria:
+- The admin leaves onboarding with at least one working local execution path.
+- Enabled modules have sane defaults instead of requiring immediate manual setup.
+
+### Phase 3: optional day-one integrations
+Goal: cover common setup that is useful early, but should never block a secure first launch.
+
+- Optionally add initial secrets such as API tokens, SSH keys, and Git tokens.
+- Optionally connect the first Git provider/repository for Sources and/or Playwright.
+
+Exit criteria:
+- These steps are skippable without blocking login or the basic local workflow.
+- Users can defer external integrations until after the first successful sign-in.
+
+## Cross-cutting rules
+
+- First-run state must be resumable. If the wizard stops halfway through, the install should remain in `onboarding` and reopen at the next required step instead of falling back to login.
+- First-admin creation and onboarding completion must be idempotent. Retrying a request must not create duplicate admins, duplicate recovery codes, or duplicate starter resources.
+- Recovery metadata should include at least the target user id, current recovery code, when it was issued, when it was last rotated, and when it was last used.
+- Recovery attempts should have their own throttle separate from normal login attempts so lockout behavior is predictable and auditable.
+- Recovery UI should not expose the code directly. The operator must retrieve it out-of-band from SQLite or an equivalent local administrative query path.
+- On successful recovery, revoke all sessions for the recovered account and require a fresh login with the new password.
+- All onboarding-sensitive actions should write audit events: first-admin created, onboarding completed, recovery attempted, recovery succeeded, recovery rotated, stealth secret rotated, and secrets key rotated or confirmed.
+- Stealth secret UX should be one-time-forward by default: show it in `setup.sh`, then mask it in normal settings unless the admin explicitly asks to reveal or rotate it.
+- Existing installs should migrate forward safely: if seeded default accounts still exist, the migration path should explicitly decide whether to keep them, disable them, or force replacement rather than silently mixing old and new bootstrap models.
+- The onboarding router should fail closed. If install state is unreadable or inconsistent, do not expose normal login with default assumptions.
+
+## Suggested schema additions
+
+- `install_state`
+  Purpose: store a single source of truth for bootstrap phase such as `fresh`, `onboarding`, `complete`, plus timestamps and the last completed onboarding step.
+- `bootstrap_recovery`
+  Purpose: store the first `super-admin` recovery record separately from normal user data, including the current recovery code and rotation metadata.
+- Optional `bootstrap_events`
+  Purpose: keep wizard progress and resumability separate from the general audit log if the audit table becomes too coarse for restart logic.
+
+## Keep out of first-run onboarding
+
+- Full user/group administration beyond the first admin.
+- Remote target and infrastructure-specific setup.
+- Deep Playwright/project configuration.
+- Bulk runtime/image builds unless the admin explicitly opts in.

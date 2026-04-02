@@ -1,0 +1,125 @@
+# ============================================================================
+# JSON FIELD TEMPLATE
+# ============================================================================
+# Extract a field from a JSON document using a simple dotted path.
+# Useful after HTTP/API steps that return JSON bodies.
+# ============================================================================
+
+id: json-field
+name: JSON Field
+version: "1.0.0"
+description: Extract a single field from a JSON document
+
+icon: fas fa-code-branch
+color: "#1E88E5"
+
+# ============================================================================
+# RUNTIME
+# ============================================================================
+runtime:
+  image: python:3.12-alpine
+
+# ============================================================================
+# INPUTS
+# ============================================================================
+inputs:
+  - name: json
+    label: JSON Text
+    type: string
+    required: true
+    description: Raw JSON string to parse
+
+  - name: path
+    label: Field Path
+    type: string
+    required: false
+    description: Dot path to extract, such as homeworld or person.name
+    placeholder: "homeworld"
+
+  - name: defaultValue
+    label: Default Value
+    type: string
+    required: false
+    description: Value to print if the path is missing
+
+# ============================================================================
+# EXECUTION
+# ============================================================================
+execution:
+  script: |
+    #!/bin/sh
+    set -eu
+
+    python3 - <<'PY'
+    import json
+    import os
+    import sys
+
+    raw = os.environ.get("INPUT_JSON", "")
+    path = os.environ.get("INPUT_PATH", "").strip()
+    default = os.environ.get("INPUT_DEFAULTVALUE", "")
+
+    def write_value(value):
+        sys.stdout.write(str(value))
+
+    if raw == "":
+        if default != "":
+            write_value(default)
+        sys.exit(0)
+
+    try:
+        data = json.loads(raw)
+    except Exception as exc:
+        print(f"Invalid JSON input: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    def read_path(value, dotted_path):
+        if dotted_path == "":
+            return value
+        current = value
+        for segment in dotted_path.split("."):
+            segment = segment.strip()
+            if segment == "":
+                continue
+            if isinstance(current, list):
+                index = int(segment)
+                current = current[index]
+                continue
+            if isinstance(current, dict):
+                current = current[segment]
+                continue
+            raise KeyError(segment)
+        return current
+
+    try:
+        result = read_path(data, path)
+    except Exception:
+        if default != "":
+            write_value(default)
+            sys.exit(0)
+        print(f"Path not found: {path}", file=sys.stderr)
+        sys.exit(1)
+
+    if result is None:
+        if default != "":
+            write_value(default)
+    elif isinstance(result, (dict, list)):
+        write_value(json.dumps(result, separators=(",", ":")))
+    else:
+        write_value(result)
+    PY
+
+  mode: sync
+  timeout: 30
+
+# ============================================================================
+# OUTPUT
+# ============================================================================
+output:
+  type: text
+
+# ============================================================================
+# REQUIREMENTS
+# ============================================================================
+requirements:
+  - python3

@@ -1,0 +1,29 @@
+# Text Diff App Manifest
+# Compare two texts with a live, visual diff
+
+id: text-diff
+name: Text Diff
+description: Compare two texts side-by-side with a live, visual diff
+icon: fa-code-compare
+color: "#38bdf8"
+version: 1.0.0
+enabled: true
+
+tags:
+  - utility
+  - developer
+  - diff
+  - compare
+  - text
+  - editor
+
+# Sandboxed - UI only
+capabilities:
+  - ui.layout
+  - audit.write
+
+navigation:
+  - id: compare
+    label: Compare
+    icon: fa-code-compare
+    page: index.php

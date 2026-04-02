@@ -1,0 +1,173 @@
+# ============================================================================
+# GIT DIFF RISK SCAN TEMPLATE
+# ============================================================================
+# Scan a local git diff and highlight risky change categories for deploy reviews.
+# ============================================================================
+
+id: git-diff-risk-scan
+name: Git Diff Risk Scan
+version: "1.0.0"
+description: Scan a local git diff for risky file categories like schema, auth, infra, config, and dependency changes
+
+icon: fas fa-triangle-exclamation
+color: "#D97706"
+
+runtime:
+  image: alpine/git:2.47.2
+  workdir: /workspace/repo
+  volumes:
+    - host: "${INPUT_REPOPATH}"
+      container: /workspace/repo
+      readonly: true
+
+inputs:
+  - name: repoPath
+    label: Repository Path
+    type: string
+    required: true
+    description: Absolute path to the local git repository on the machine running Doki
+    placeholder: "/Users/you/projects/service-api"
+
+  - name: baseRef
+    label: Base Ref
+    type: string
+    required: false
+    default: HEAD~1
+    description: Older git ref for the diff range
+
+  - name: headRef
+    label: Head Ref
+    type: string
+    required: false
+    default: HEAD
+    description: Newer git ref for the diff range
+
+  - name: maxFiles
+    label: Changed Files To Show
+    type: number
+    required: false
+    default: 30
+    description: Maximum number of changed files to list in the summary
+    validation:
+      min: 1
+      max: 200
+
+execution:
+  script: |
+    #!/bin/sh
+    set -eu
+
+    BASE_REF="${INPUT_BASEREF:-HEAD~1}"
+    HEAD_REF="${INPUT_HEADREF:-HEAD}"
+    MAX_FILES="${INPUT_MAXFILES:-30}"
+
+    cd /workspace/repo
+
+    if ! git rev-parse --git-dir >/dev/null 2>&1; then
+      echo "Not a git repository: ${INPUT_REPOPATH:-/workspace/repo}"
+      exit 1
+    fi
+
+    TMP="$(mktemp)"
+    trap 'rm -f "$TMP"' EXIT
+
+    git diff --name-only "$BASE_REF" "$HEAD_REF" > "$TMP"
+
+    TOTAL="$(grep -c . "$TMP" || true)"
+    if [ "$TOTAL" -eq 0 ]; then
+      echo "Git Diff Risk Scan"
+      echo "=================="
+      echo "Range: $BASE_REF..$HEAD_REF"
+      echo "Risk level: low"
+      echo "No changed files detected."
+      exit 0
+    fi
+
+    DB_SCHEMA=0
+    AUTH_SECURITY=0
+    INFRA_DEPLOY=0
+    DEPENDENCIES=0
+    CONFIG_SECRETS=0
+    CI_PIPELINE=0
+    PREVIEW=""
+    SHOWN=0
+
+    while IFS= read -r file; do
+      [ -n "$file" ] || continue
+
+      case "$file" in
+        *migrations/*|*migration*|*.sql|schema.prisma|db/schema*|*/schema.rb|*/structure.sql)
+          DB_SCHEMA=$((DB_SCHEMA + 1))
+          ;;
+      esac
+
+      case "$file" in
+        *auth*|*permission*|*policy*|*rbac*|*secret*|*oauth*|*jwt*|*acl*|*security*)
+          AUTH_SECURITY=$((AUTH_SECURITY + 1))
+          ;;
+      esac
+
+      case "$file" in
+        Dockerfile*|docker-compose*|*.tf|helm/*|k8s/*|deploy/*|ops/*)
+          INFRA_DEPLOY=$((INFRA_DEPLOY + 1))
+          ;;
+      esac
+
+      case "$file" in
+        package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|composer.json|composer.lock|go.mod|go.sum|Gemfile|Gemfile.lock|Cargo.toml|Cargo.lock|requirements*.txt|poetry.lock)
+          DEPENDENCIES=$((DEPENDENCIES + 1))
+          ;;
+      esac
+
+      case "$file" in
+        .env|.env.*|config/*|settings/*|secrets/*|*.pem|*.key)
+          CONFIG_SECRETS=$((CONFIG_SECRETS + 1))
+          ;;
+      esac
+
+      case "$file" in
+        .github/workflows/*|.gitlab-ci.yml|Jenkinsfile|azure-pipelines.yml|circle.yml|.circleci/*)
+          CI_PIPELINE=$((CI_PIPELINE + 1))
+          ;;
+      esac
+
+      if [ "$SHOWN" -lt "$MAX_FILES" ]; then
+        PREVIEW="${PREVIEW}- ${file}\n"
+        SHOWN=$((SHOWN + 1))
+      fi
+    done < "$TMP"
+
+    RISK_LEVEL="low"
+    if [ "$DB_SCHEMA" -gt 0 ] || [ "$AUTH_SECURITY" -gt 0 ]; then
+      RISK_LEVEL="critical"
+    elif [ "$INFRA_DEPLOY" -gt 0 ] || [ "$DEPENDENCIES" -gt 0 ] || [ "$CONFIG_SECRETS" -gt 0 ]; then
+      RISK_LEVEL="high"
+    elif [ "$CI_PIPELINE" -gt 0 ]; then
+      RISK_LEVEL="medium"
+    fi
+
+    echo "Git Diff Risk Scan"
+    echo "=================="
+    echo "Range: $BASE_REF..$HEAD_REF"
+    echo "Changed files: $TOTAL"
+    echo "Risk level: $RISK_LEVEL"
+    echo ""
+    echo "Risk buckets:"
+    echo "- Database or schema files: $DB_SCHEMA"
+    echo "- Auth or security files: $AUTH_SECURITY"
+    echo "- Infra or deploy files: $INFRA_DEPLOY"
+    echo "- Dependency files: $DEPENDENCIES"
+    echo "- Config or secret files: $CONFIG_SECRETS"
+    echo "- CI or pipeline files: $CI_PIPELINE"
+    echo ""
+    echo "Changed files:"
+    printf "%b" "$PREVIEW"
+
+  mode: sync
+  timeout: 60
+
+output:
+  type: text
+
+requirements:
+  - git

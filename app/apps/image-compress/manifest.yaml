@@ -1,0 +1,43 @@
+# Image Compressor App Manifest
+# Compress images to reduce file size with quality control
+
+id: image-compress
+name: Image Compressor
+description: Compress images to reduce file size while maintaining quality
+icon: fa-compress-alt
+color: "#16a34a"
+version: 1.0.0
+enabled: true
+
+# Tags for organization and discovery
+tags:
+  - media
+  - image
+  - compression
+  - optimization
+
+capabilities:
+  - ui.layout
+  - fs.app_data
+  - audit.write
+  - exec.docker
+
+# Custom runtime - app runs in its own FPM container with these extensions
+runtime:
+  phpExtensions:
+    - zip  # For Download All feature (native ZipArchive)
+
+# Uses ImageMagick container for image processing (on-demand)
+requiredImages:
+  - image: dpokidov/imagemagick:7.1.1-15
+    lifecycle: on-demand
+
+navigation:
+  - id: compress
+    label: Compress Images
+    icon: fa-images
+    page: index.php
+  - id: history
+    label: Compression History
+    icon: fa-history
+    page: history.php

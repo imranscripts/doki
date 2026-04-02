@@ -1,0 +1,54 @@
+# Doki current feature inventory
+
+## Core shell
+- Stealth-mode front door: unauthenticated visitors can be routed to a hidden 404-style page before login.
+- Session-based auth with login, logout, password change, session expiry, and rate-limited failed logins.
+- Smart landing page that redirects each user to the first module or app they can actually access.
+- Role model with `super-admin`, `admin`, and `user`.
+- Granular permissions layered on top of roles: whitelist groups, blacklist groups, and per-user allow/deny overrides.
+- Shared layout with sidebar navigation, recent apps, pinned apps, tag organization, and per-user app order/preferences.
+- Dashboard with stats, quick actions, and recent activity widgets.
+
+## Automation and operations
+- Read-only template catalog for reusable execution patterns.
+- Command builder for multi-step workflows with dependencies, inputs, tags, environments, default targets, and secret mappings.
+- Command preview before execution.
+- Command execution through the Go orchestrator, with sync/async jobs, recent job listing, job details, and cancellation.
+- Execution history UI with filters and output inspection.
+
+## Infrastructure configuration
+- Target management for `ssh`, `docker`, `docker-exec`, `local`, `http`, and schema-level `kubernetes` targets.
+- Target verification and capability setup helpers.
+- Environment management that maps names and policies to targets.
+- Encrypted secrets store using AES-256-GCM with a disk-backed key file and password re-auth before revealing secret values.
+- Config backup/history and restore for targets, environments, secrets, and commands.
+
+## Administration and governance
+- User management: create, update, deactivate, and delete users.
+- Permission-group management, membership management, and explicit resource rules for apps, commands, and modules.
+- Audit log with filters plus CSV/JSON export.
+- Sources management for Git providers and repositories.
+
+## Apps platform
+- File-system app discovery via app manifests.
+- Trust model and capability gating for apps: core, verified, trusted, sandboxed.
+- App settings storage and settings history.
+- App browsing page with search, tag filters, pinned/recent/all views, and per-user ordering.
+- Admin app management for trust level, priority, exec target assignment, and runtime lifecycle.
+- Custom app runtimes: per-app PHP-FPM images, Docker-managed containers, and FastCGI proxying for apps that need extra PHP extensions.
+- Source sync/discovery for apps, templates, and Playwright test repos.
+
+## Built-in apps
+- Playwright: runner image management, project CRUD, upload or Git-backed projects, in-browser file editing, test execution, job tracking, reports, and report cleanup.
+- JSON Viewer: view, beautify, validate, fix, export, and history.
+- Text Diff: side-by-side diffing.
+- Mermaid Viewer: render diagrams and browse a gallery.
+- Weather: lookup plus history.
+- Image Compressor: upload, compress, history, and downloads.
+- Image Enhancer: AI upscaling/restoration, history, and downloads.
+- Word to PDF and PDF to Word converters with history and downloads.
+
+## Notable current-state gaps / partial areas
+- Onboarding/bootstrap is not implemented yet; the app still auto-seeds a default `admin / changeme123!` super-admin.
+- Kubernetes support looks partial rather than complete.
+- Sources is usable, but the architecture notes still mark that area as partial/in progress.

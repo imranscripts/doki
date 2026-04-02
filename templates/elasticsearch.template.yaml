@@ -1,0 +1,148 @@
+# ============================================================================
+# ELASTICSEARCH TEMPLATE
+# ============================================================================
+# Shareable template for Elasticsearch operations.
+# NO endpoints, NO credentials - just the tool definition.
+# ============================================================================
+
+id: elasticsearch
+name: Elasticsearch Operations
+version: "1.0.0"
+description: Query and monitor Elasticsearch clusters
+targetType: elasticsearch    # Maps to 'elasticsearch' target in environment
+
+icon: fas fa-search
+color: "#00BCD4"
+
+# ============================================================================
+# RUNTIME - Container this template runs in
+# ============================================================================
+runtime:
+  image: alpine/curl:latest
+  # Orchestrator injects ES_ENDPOINT, ES_AUTH from target
+
+# ============================================================================
+# INPUTS
+# ============================================================================
+inputs:
+  - name: url
+    label: Elasticsearch URL
+    type: string
+    required: true
+    description: Full Elasticsearch endpoint URL
+    placeholder: "http://localhost:9200"
+    
+  - name: operation
+    label: Operation
+    type: select
+    required: true
+    options:
+      - value: health
+        label: Cluster Health
+      - value: indices
+        label: List Indices
+      - value: count
+        label: Document Count
+      - value: get
+        label: Get Document
+      - value: search
+        label: Search
+      - value: mapping
+        label: Get Mapping
+        
+  - name: index
+    label: Index
+    type: string
+    required: false
+    description: Target index (not required for cluster operations)
+      
+  - name: documentId
+    label: Document ID
+    type: string
+    required: false
+    
+  - name: query
+    label: Query (JSON)
+    type: string
+    required: false
+    placeholder: '{"query": {"match_all": {}}}'
+    
+  - name: size
+    label: Result Size
+    type: number
+    required: false
+    default: 10
+    validation:
+      min: 1
+      max: 1000
+
+# ============================================================================
+# EXECUTION
+# ============================================================================
+execution:
+  script: |
+    ES_URL="{{url}}"
+    
+    case "{{operation}}" in
+      health)
+        curl -s "$ES_URL/_cluster/health?pretty"
+        ;;
+      indices)
+        curl -s "$ES_URL/_cat/indices?v"
+        ;;
+      count)
+        if [ -z "{{index}}" ]; then
+          echo "Error: Index required for count operation"
+          exit 1
+        fi
+        curl -s "$ES_URL/{{index}}/_count" | jq '.'
+        ;;
+      get)
+        if [ -z "{{index}}" ] || [ -z "{{documentId}}" ]; then
+          echo "Error: Index and Document ID required for get operation"
+          exit 1
+        fi
+        curl -s "$ES_URL/{{index}}/_doc/{{documentId}}?pretty"
+        ;;
+      search)
+        if [ -z "{{index}}" ]; then
+          echo "Error: Index required for search operation"
+          exit 1
+        fi
+        QUERY='{{query}}'
+        if [ -z "$QUERY" ]; then
+          QUERY='{"query": {"match_all": {}}}'
+        fi
+        curl -s -X POST "$ES_URL/{{index}}/_search?pretty&size={{size}}" \
+          -H 'Content-Type: application/json' \
+          -d "$QUERY"
+        ;;
+      mapping)
+        if [ -z "{{index}}" ]; then
+          echo "Error: Index required for mapping operation"
+          exit 1
+        fi
+        curl -s "$ES_URL/{{index}}/_mapping?pretty"
+        ;;
+    esac
+    
+  mode: sync
+  timeout: 60
+
+# ============================================================================
+# OUTPUT
+# ============================================================================
+output:
+  type: json
+
+# ============================================================================
+# REQUIREMENTS
+# ============================================================================
+requirements:
+  - curl
+  - jq
+
+# ============================================================================
+# TARGET BINDINGS - None required
+# ============================================================================
+# URL is provided directly as input, no target bindings needed

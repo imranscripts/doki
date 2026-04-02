@@ -1,0 +1,7 @@
+# Playwright test artifacts
+test-results/
+playwright-report/
+.playwright/
+
+# Source-managed Playwright projects synced from Doki Sources
+src-*/

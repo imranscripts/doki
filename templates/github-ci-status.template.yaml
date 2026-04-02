@@ -1,0 +1,162 @@
+# ============================================================================
+# GITHUB CI STATUS TEMPLATE
+# ============================================================================
+# Fetch the latest GitHub Actions run and summarize its status.
+# ============================================================================
+
+id: github-ci-status
+name: GitHub CI Status
+version: "1.0.0"
+description: Fetch the latest GitHub Actions run for a repository or branch and summarize status, conclusion, and failing jobs
+
+icon: fab fa-github
+color: "#2563EB"
+
+runtime:
+  image: python:3.12-alpine
+  network: host
+
+inputs:
+  - name: repo
+    label: Repository
+    type: string
+    required: true
+    description: Repository in owner/name format
+    placeholder: "openai/openai-python"
+    validation:
+      pattern: "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+
+  - name: branch
+    label: Branch
+    type: string
+    required: false
+    description: Optional branch to filter workflow runs
+    placeholder: "main"
+
+  - name: workflowName
+    label: Workflow Name
+    type: string
+    required: false
+    description: Optional workflow name to filter the latest run
+    placeholder: "CI"
+
+  - name: failOnNonSuccess
+    label: Fail On Non-Success
+    type: select
+    required: false
+    default: "false"
+    description: Exit with an error if the latest run is not successful
+    options:
+      - value: "false"
+        label: No
+      - value: "true"
+        label: Yes
+
+execution:
+  script: |
+    #!/bin/sh
+    set -eu
+
+    python3 - <<'PY'
+    import json
+    import os
+    import sys
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    repo = os.environ.get("INPUT_REPO", "").strip()
+    branch = os.environ.get("INPUT_BRANCH", "").strip()
+    workflow_name = os.environ.get("INPUT_WORKFLOWNAME", "").strip()
+    fail_on_non_success = os.environ.get("INPUT_FAILONNONSUCCESS", "false").strip().lower() == "true"
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+
+    if not repo:
+        print("Repository is required.", file=sys.stderr)
+        sys.exit(1)
+
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "doki-template/github-ci-status",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    def get_json(url: str):
+        request = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            print(f"GitHub API request failed: {exc.code} {exc.reason}", file=sys.stderr)
+            if body:
+                print(body, file=sys.stderr)
+            sys.exit(1)
+        except Exception as exc:
+            print(f"GitHub API request failed: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+    params = {"per_page": "10"}
+    if branch:
+        params["branch"] = branch
+    runs_url = f"https://api.github.com/repos/{repo}/actions/runs?{urllib.parse.urlencode(params)}"
+    runs_payload = get_json(runs_url)
+    runs = runs_payload.get("workflow_runs", [])
+
+    selected = None
+    if workflow_name:
+        for run in runs:
+            if (run.get("name") or "").strip().lower() == workflow_name.lower():
+                selected = run
+                break
+    elif runs:
+        selected = runs[0]
+
+    if not selected:
+        print("No workflow runs matched the current filters.")
+        sys.exit(1)
+
+    jobs_payload = get_json(selected.get("jobs_url", "") + "?per_page=100") if selected.get("jobs_url") else {"jobs": []}
+    failed_jobs = []
+    for job in jobs_payload.get("jobs", []):
+        conclusion = (job.get("conclusion") or "").strip().lower()
+        if conclusion and conclusion not in {"success", "neutral", "skipped"}:
+            failed_jobs.append(job.get("name", "Unnamed job"))
+
+    status = selected.get("status", "unknown")
+    conclusion = selected.get("conclusion") or "pending"
+
+    print("GitHub CI Status")
+    print("================")
+    print(f"Repository: {repo}")
+    print(f"Workflow: {selected.get('name', 'Unnamed workflow')}")
+    print(f"Branch: {selected.get('head_branch', branch or 'unknown')}")
+    print(f"Status: {status}")
+    print(f"Conclusion: {conclusion}")
+    print(f"Commit: {(selected.get('head_sha') or '')[:12]}")
+    print(f"Actor: {(selected.get('actor') or {}).get('login', 'unknown')}")
+    print(f"Run URL: {selected.get('html_url', '')}")
+    print(f"Started: {selected.get('run_started_at', 'unknown')}")
+    print(f"Updated: {selected.get('updated_at', 'unknown')}")
+    print(f"Failed jobs: {len(failed_jobs)}")
+
+    if failed_jobs:
+        print("")
+        print("Failing jobs:")
+        for name in failed_jobs[:10]:
+            print(f"- {name}")
+
+    bad_conclusion = conclusion.lower() not in {"success", "neutral", "skipped"}
+    if fail_on_non_success and (status.lower() != "completed" or bad_conclusion):
+        sys.exit(1)
+    PY
+
+  mode: sync
+  timeout: 45
+
+output:
+  type: text
+
+requirements:
+  - python3

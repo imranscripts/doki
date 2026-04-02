@@ -1,0 +1,269 @@
+<?php
+/**
+ * SystemModuleRegistry.php - Canonical Doki module metadata
+ */
+
+class SystemModuleRegistry {
+    public const SECTION_HOME = 'home';
+    public const SECTION_APPS = 'apps';
+    public const SECTION_WORKFLOWS = 'workflows';
+    public const SECTION_STUDIO = 'studio';
+    public const SECTION_CONFIGURATION = 'configuration';
+    public const SECTION_ADMINISTRATION = 'administration';
+    public const SECTION_HIDDEN = 'hidden';
+
+    public static function getSectionDefinitions(): array {
+        return [
+            self::SECTION_HOME => [
+                'id' => self::SECTION_HOME,
+                'label' => 'Home',
+                'sidebar' => true,
+            ],
+            self::SECTION_APPS => [
+                'id' => self::SECTION_APPS,
+                'label' => 'Apps',
+                'sidebar' => true,
+            ],
+            self::SECTION_WORKFLOWS => [
+                'id' => self::SECTION_WORKFLOWS,
+                'label' => 'Workflows',
+                'sidebar' => true,
+            ],
+            self::SECTION_STUDIO => [
+                'id' => self::SECTION_STUDIO,
+                'label' => 'Studio',
+                'sidebar' => true,
+            ],
+            self::SECTION_CONFIGURATION => [
+                'id' => self::SECTION_CONFIGURATION,
+                'label' => 'Configuration',
+                'sidebar' => true,
+            ],
+            self::SECTION_ADMINISTRATION => [
+                'id' => self::SECTION_ADMINISTRATION,
+                'label' => 'Administration',
+                'sidebar' => true,
+            ],
+            self::SECTION_HIDDEN => [
+                'id' => self::SECTION_HIDDEN,
+                'label' => 'Feature Toggles',
+                'sidebar' => false,
+            ],
+        ];
+    }
+
+    public static function getModuleDefinitions(): array {
+        return [
+            'dashboard' => [
+                'id' => 'dashboard',
+                'label' => 'Home',
+                'navLabel' => 'Home',
+                'icon' => 'fa-house',
+                'path' => 'dashboard.php',
+                'roles' => ['super-admin', 'admin', 'user'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_HOME,
+                'description' => 'Landing page and high-level overview.',
+                'fixedSection' => true,
+                'searchLabel' => 'Home Dashboard',
+            ],
+            'apps' => [
+                'id' => 'apps',
+                'label' => 'Apps Hub',
+                'navLabel' => 'Browse All Apps',
+                'icon' => 'fa-th-large',
+                'path' => 'apps.php',
+                'roles' => ['super-admin', 'admin', 'user'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_APPS,
+                'description' => 'Apps hub and the installed apps section in the sidebar.',
+                'fixedSection' => true,
+            ],
+            'commands' => [
+                'id' => 'commands',
+                'label' => 'Commands',
+                'icon' => 'fa-terminal',
+                'path' => 'commands.php',
+                'roles' => ['super-admin', 'admin', 'user'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_WORKFLOWS,
+                'description' => 'Reusable command execution and command management.',
+            ],
+            'templates' => [
+                'id' => 'templates',
+                'label' => 'Templates',
+                'icon' => 'fa-cubes',
+                'path' => 'templates.php',
+                'roles' => ['super-admin', 'admin', 'user'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_WORKFLOWS,
+                'description' => 'Template library for reusable command inputs.',
+            ],
+            'history' => [
+                'id' => 'history',
+                'label' => 'History',
+                'icon' => 'fa-history',
+                'path' => 'history.php',
+                'roles' => ['super-admin', 'admin', 'user'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_WORKFLOWS,
+                'description' => 'Execution and activity history.',
+            ],
+            'targets' => [
+                'id' => 'targets',
+                'label' => 'Targets',
+                'icon' => 'fa-server',
+                'path' => 'config/targets.php',
+                'roles' => ['super-admin', 'admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_CONFIGURATION,
+                'description' => 'Runtime targets and deployment connections.',
+            ],
+            'environments' => [
+                'id' => 'environments',
+                'label' => 'Environments',
+                'icon' => 'fa-layer-group',
+                'path' => 'config/environments.php',
+                'roles' => ['super-admin', 'admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_CONFIGURATION,
+                'description' => 'Shared environment definitions.',
+            ],
+            'secrets' => [
+                'id' => 'secrets',
+                'label' => 'Secrets',
+                'icon' => 'fa-key',
+                'path' => 'config/secrets.php',
+                'roles' => ['super-admin', 'admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_CONFIGURATION,
+                'description' => 'Managed secret storage and reveal workflow.',
+            ],
+            'users' => [
+                'id' => 'users',
+                'label' => 'Users',
+                'icon' => 'fa-users',
+                'path' => 'admin/users.php',
+                'roles' => ['super-admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_ADMINISTRATION,
+                'description' => 'User accounts and roles.',
+            ],
+            'groups' => [
+                'id' => 'groups',
+                'label' => 'Groups',
+                'icon' => 'fa-users-gear',
+                'path' => 'admin/groups.php',
+                'roles' => ['super-admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_ADMINISTRATION,
+                'description' => 'Permission groups and access rules.',
+            ],
+            'doki.admin' => [
+                'id' => 'doki.admin',
+                'label' => 'Doki Admin',
+                'icon' => 'fa-sliders',
+                'path' => 'admin/settings.php',
+                'roles' => ['super-admin', 'admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_ADMINISTRATION,
+                'description' => 'System-wide Doki modules and security settings.',
+                'dividerBefore' => true,
+            ],
+            'admin-apps' => [
+                'id' => 'admin-apps',
+                'label' => 'App Management',
+                'navLabel' => 'Apps',
+                'icon' => 'fa-puzzle-piece',
+                'path' => 'admin/apps.php',
+                'roles' => ['super-admin', 'admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_ADMINISTRATION,
+                'description' => 'App catalog, installation, and app metadata.',
+                'dividerBefore' => true,
+            ],
+            'studio' => [
+                'id' => 'studio',
+                'label' => 'App Studio',
+                'icon' => 'fa-screwdriver-wrench',
+                'path' => 'admin/studio.php',
+                'roles' => ['super-admin', 'admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_STUDIO,
+                'allowedSections' => [self::SECTION_STUDIO, self::SECTION_HIDDEN],
+                'description' => 'Workspace-based app authoring and previews.',
+            ],
+            'studio.workflows' => [
+                'id' => 'studio.workflows',
+                'label' => 'Workflows',
+                'icon' => 'fa-diagram-project',
+                'path' => 'admin/studio-workflows.php',
+                'roles' => ['super-admin', 'admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_STUDIO,
+                'allowedSections' => [self::SECTION_STUDIO, self::SECTION_HIDDEN],
+                'description' => 'Draft, validate, and publish workflows and reusable templates.',
+            ],
+            'studio.ai' => [
+                'id' => 'studio.ai',
+                'label' => 'App Studio AI',
+                'icon' => 'fa-wand-magic-sparkles',
+                'path' => null,
+                'roles' => ['super-admin', 'admin'],
+                'sidebarVisible' => false,
+                'defaultSection' => self::SECTION_HIDDEN,
+                'description' => 'Capability toggle for AI inside App Studio.',
+                'fixedSection' => true,
+            ],
+            'ai.admin' => [
+                'id' => 'ai.admin',
+                'label' => 'AI Administration',
+                'navLabel' => 'AI',
+                'icon' => 'fa-robot',
+                'path' => 'admin/ai.php',
+                'roles' => ['super-admin', 'admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_ADMINISTRATION,
+                'description' => 'Providers and AI context settings.',
+                'dividerBefore' => true,
+            ],
+            'sources' => [
+                'id' => 'sources',
+                'label' => 'Sources',
+                'icon' => 'fa-code-branch',
+                'path' => 'admin/sources.php',
+                'roles' => ['super-admin', 'admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_ADMINISTRATION,
+                'description' => 'Repository and source provider management.',
+                'dividerBefore' => true,
+            ],
+            'audit' => [
+                'id' => 'audit',
+                'label' => 'Audit Log',
+                'icon' => 'fa-clock-rotate-left',
+                'path' => 'admin/audit.php',
+                'roles' => ['super-admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_ADMINISTRATION,
+                'description' => 'System audit trail and security events.',
+                'dividerBefore' => true,
+            ],
+            'config-history' => [
+                'id' => 'config-history',
+                'label' => 'Config History',
+                'icon' => 'fa-history',
+                'path' => 'admin/history.php',
+                'roles' => ['super-admin', 'admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_ADMINISTRATION,
+                'description' => 'Configuration backups and restore history.',
+            ],
+        ];
+    }
+
+    public static function getModuleDefinition(string $moduleId): ?array {
+        $definitions = self::getModuleDefinitions();
+        return $definitions[$moduleId] ?? null;
+    }
+}

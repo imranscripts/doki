@@ -1,0 +1,20 @@
+---
+apps:
+  playwright:
+    source: core
+    trustLevel: 0
+    installedAt: "2026-01-01T00:00:00Z"
+    installedBy: system
+  image-compress:
+    source: local
+    installedAt: "2026-01-25T11:50:00+00:00"
+    installedBy: system
+    trustLevel: 2
+    trustChangedAt: "2026-01-25T11:50:00+00:00"
+    trustChangedBy: system
+    trustChangeReason: requires Docker execution for ImageMagick
+  text-diff:
+    source: local
+    installedAt: "2026-02-14T15:17:19+00:00"
+    installedBy: system
+...

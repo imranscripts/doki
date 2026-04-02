@@ -1,0 +1,6 @@
+# Ignore database file
+*.db
+
+# Except these
+!.gitignore
+!config/

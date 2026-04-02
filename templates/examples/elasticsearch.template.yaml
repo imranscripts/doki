@@ -1,0 +1,219 @@
+# ============================================================================
+# ELASTICSEARCH TEMPLATE
+# ============================================================================
+# Template for Elasticsearch operations (queries, health checks, admin)
+# Runs in a minimal Alpine container with curl and jq
+# ============================================================================
+
+id: elasticsearch-ops
+name: Elasticsearch Operations
+category: Database
+description: Query, monitor, and manage Elasticsearch clusters
+icon: fas fa-search
+color: "#00BCD4"
+
+# ----------------------------------------------------------------------------
+# RUNTIME: Minimal container with curl + jq
+# ----------------------------------------------------------------------------
+runtime:
+  image: alpine/curl:latest
+  env:
+    - name: ES_HOST
+      fromSecret: ELASTICSEARCH_HOST  # e.g., http://elastic:9200
+    - name: ES_USER
+      fromSecret: ELASTICSEARCH_USER
+    - name: ES_PASS
+      fromSecret: ELASTICSEARCH_PASS
+  resources:
+    memory: 64m
+    cpu: "0.1"
+    timeout: 60
+  network: bridge  # Or custom network to reach ES
+
+# ----------------------------------------------------------------------------
+# INPUTS
+# ----------------------------------------------------------------------------
+inputs:
+  - name: operation
+    label: Operation
+    type: select
+    required: true
+    options:
+      - value: health
+        label: 🟢 Cluster Health
+      - value: count
+        label: 📊 Document Count
+      - value: get
+        label: 📄 Get Document
+      - value: search
+        label: 🔍 Search Query
+      - value: mapping
+        label: 🗺️ Get Mapping
+      - value: indices
+        label: 📁 List Indices
+      - value: aliases
+        label: 🔗 Check Aliases
+    description: The Elasticsearch operation to perform
+  
+  - name: index
+    label: Index Name
+    type: string
+    required: false
+    placeholder: "e.g., ocp_produit, ocp_commande"
+    description: Target index (not required for cluster operations)
+    validation:
+      pattern: "^[a-z0-9_-]+$"
+      maxLength: 255
+  
+  - name: documentId
+    label: Document ID
+    type: string
+    required: false
+    placeholder: "e.g., abc123"
+    description: Document ID (for get operation)
+  
+  - name: query
+    label: Search Query (JSON)
+    type: string  # Could be 'code' type in future
+    required: false
+    placeholder: '{"query": {"match_all": {}}}'
+    description: Elasticsearch query DSL in JSON format
+  
+  - name: size
+    label: Result Size
+    type: number
+    required: false
+    default: 10
+    description: Number of results to return
+    validation:
+      min: 1
+      max: 1000
+
+# ----------------------------------------------------------------------------
+# EXECUTION
+# ----------------------------------------------------------------------------
+execution:
+  mode: sync
+  script: |
+    #!/bin/sh
+    set -e
+    
+    # Install jq if not present
+    apk add --no-cache jq > /dev/null 2>&1 || true
+    
+    # Build auth header if credentials provided
+    AUTH=""
+    if [ -n "$ES_USER" ] && [ -n "$ES_PASS" ]; then
+      AUTH="-u $ES_USER:$ES_PASS"
+    fi
+    
+    # Helper function for curl
+    es_curl() {
+      curl -s $AUTH -H "Content-Type: application/json" "$@"
+    }
+    
+    case "{{operation}}" in
+      health)
+        echo "🏥 Cluster Health"
+        echo "================"
+        es_curl "$ES_HOST/_cluster/health?pretty" | jq '.'
+        ;;
+      
+      indices)
+        echo "📁 Indices"
+        echo "=========="
+        es_curl "$ES_HOST/_cat/indices?v&s=index"
+        ;;
+      
+      count)
+        if [ -z "{{index}}" ]; then
+          echo "Error: Index name required for count operation"
+          exit 1
+        fi
+        echo "📊 Document Count: {{index}}"
+        echo "=========================="
+        es_curl "$ES_HOST/{{index}}/_count" | jq '.'
+        ;;
+      
+      get)
+        if [ -z "{{index}}" ] || [ -z "{{documentId}}" ]; then
+          echo "Error: Index and Document ID required"
+          exit 1
+        fi
+        echo "📄 Document: {{index}}/{{documentId}}"
+        echo "===================================="
+        es_curl "$ES_HOST/{{index}}/_doc/{{documentId}}?pretty" | jq '.'
+        ;;
+      
+      search)
+        if [ -z "{{index}}" ]; then
+          echo "Error: Index name required for search"
+          exit 1
+        fi
+        
+        QUERY='{{query}}'
+        if [ -z "$QUERY" ]; then
+          QUERY='{"query": {"match_all": {}}}'
+        fi
+        
+        echo "🔍 Search: {{index}}"
+        echo "==================="
+        es_curl -X POST "$ES_HOST/{{index}}/_search?pretty&size={{size}}" -d "$QUERY" | jq '.'
+        ;;
+      
+      mapping)
+        if [ -z "{{index}}" ]; then
+          echo "Error: Index name required"
+          exit 1
+        fi
+        echo "🗺️ Mapping: {{index}}"
+        echo "===================="
+        es_curl "$ES_HOST/{{index}}/_mapping?pretty" | jq '.'
+        ;;
+      
+      aliases)
+        echo "🔗 Checking Aliases"
+        echo "==================="
+        # Find indices with multiple aliases (potential issues)
+        RESULT=$(es_curl "$ES_HOST/_aliases" | jq -r '
+          to_entries 
+          | map(select(.value.aliases | length > 1)) 
+          | if length == 0 then "✅ All aliases OK - no conflicts found" 
+            else "⚠️ Indices with multiple aliases:\n" + (.[].key | @text) 
+          end
+        ')
+        echo "$RESULT"
+        ;;
+      
+      *)
+        echo "Unknown operation: {{operation}}"
+        exit 1
+        ;;
+    esac
+
+# ----------------------------------------------------------------------------
+# OUTPUT
+# ----------------------------------------------------------------------------
+output:
+  type: json
+  schema:
+    type: object
+
+# ----------------------------------------------------------------------------
+# UI
+# ----------------------------------------------------------------------------
+ui:
+  button:
+    label: Query
+    icon: fas fa-search
+    style: info
+  showLiveOutput: true
+  confirm:
+    enabled: false
+
+# ----------------------------------------------------------------------------
+# ACCESS
+# ----------------------------------------------------------------------------
+access:
+  allowedRoles: [admin, dev]
+  createRoles: [admin]

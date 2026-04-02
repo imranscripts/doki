@@ -1,0 +1,60 @@
+# Prevent directory browsing
+Options -Indexes
+
+# Deny access to sensitive files
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Allow access to commands.yml for authenticated users (checked by PHP session)
+# Other .yml files remain blocked
+<Files "commands.yml">
+    Require all granted
+</Files>
+
+# Deny access to other .yml files
+<FilesMatch "\.yml$">
+    <Files ~ "^((?!commands\.yml).)*$">
+        Require all denied
+    </Files>
+</FilesMatch>
+
+# Deny access to .sh files
+<FilesMatch "\.sh$">
+    Require all denied
+</FilesMatch>
+
+# Deny access to package.json and other config files
+<FilesMatch "(package\.json|package-lock\.json|tsconfig\.json|playwright\.config\.ts)$">
+    Require all denied
+</FilesMatch>
+
+# Allow only specific file types to be accessed directly
+# Only PHP files, HTML reports, videos, and images
+<FilesMatch "\.(php|html|webm|mp4|png|jpg|jpeg|gif|css|js)$">
+    Require all granted
+</FilesMatch>
+
+# Block access to playwright test files
+<FilesMatch "\.test\.(ts|js)$">
+    Require all denied
+</FilesMatch>
+
+# Block access to node_modules
+RedirectMatch 403 /node_modules/.*
+
+# Enable rewrite engine for clean URLs
+RewriteEngine On
+
+# Route runtime-installed apps from app/data when no bundled app file exists.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^apps/([a-z0-9_-]+)/?$ installed-app-router.php?appId=$1 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^apps/([a-z0-9_-]+)/(.*)$ installed-app-router.php?appId=$1&path=$2 [QSA,L]
+
+# Protect playwright-jobs directory - only allow through PHP scripts
+RewriteCond %{REQUEST_URI} ^/playwright-jobs/
+RewriteRule .* - [F,L]

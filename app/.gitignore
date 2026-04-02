@@ -1,0 +1,13 @@
+.cache/
+.pki/
+node_modules/
+.ssh/
+playwright-results/
+test-results/
+playwright-report/
+playwright-reports-archive/
+package-lock.json
+.npm-cache/
+.playwright-browsers/
+playwright-jobs/
+studio-previews/

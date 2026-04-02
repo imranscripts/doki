@@ -1,0 +1,4 @@
+# Ignore runtime app data
+*
+
+!.gitignore

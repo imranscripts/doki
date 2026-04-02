@@ -1,0 +1,173 @@
+# ============================================================================
+# DOKI TEMPLATE SCHEMA
+# ============================================================================
+# This is the universal schema that ALL templates must follow.
+# Templates are the "blueprints" for creating commands.
+# ============================================================================
+
+# Required: Unique template identifier
+id: string  # e.g., "docker-exec", "playwright-test", "elasticsearch-query"
+
+# Required: Human-readable name
+name: string
+
+# Required: Template category (for grouping in UI)
+category: string  # e.g., "Docker", "Testing", "Database", "Monitoring"
+
+# Required: Short description
+description: string
+
+# Required: Icon (FontAwesome class)
+icon: string  # e.g., "fab fa-docker"
+
+# Optional: Accent color for UI
+color: string  # e.g., "#2196F3"
+
+# ============================================================================
+# RUNTIME CONFIGURATION
+# ============================================================================
+runtime:
+  # Required: Container image to run this template in
+  image: string  # e.g., "docker:cli", "mcr.microsoft.com/playwright:v1.40.0"
+  
+  # Optional: Entrypoint override
+  entrypoint: string  # e.g., "/bin/sh"
+  
+  # Optional: Working directory inside container
+  workdir: string  # e.g., "/workspace"
+  
+  # Optional: Environment variables (can reference secrets)
+  env:
+    - name: string
+      value: string  # Can use ${SECRET_NAME} syntax
+      fromSecret: string  # Or reference a secret directly
+  
+  # Optional: Volume mounts (restricted to allowed paths)
+  volumes:
+    - host: string    # e.g., "/var/log"
+      container: string  # e.g., "/logs"
+      readonly: boolean  # default: true
+  
+  # Optional: Network mode
+  network: string  # "host" | "bridge" | "none" | custom network name
+  
+  # Optional: Resource limits
+  resources:
+    memory: string  # e.g., "512m"
+    cpu: string     # e.g., "0.5"
+    timeout: integer  # seconds, default: 300
+
+# ============================================================================
+# INPUT PARAMETERS
+# ============================================================================
+inputs:
+  - name: string  # Parameter name (used in command interpolation)
+    label: string  # Human-readable label for UI
+    type: string   # "string" | "number" | "boolean" | "select" | "multiselect" | "file" | "secret"
+    required: boolean
+    default: any
+    placeholder: string
+    description: string
+    
+    # For select/multiselect types
+    options:
+      - value: string
+        label: string
+    
+    # Validation rules
+    validation:
+      pattern: string  # Regex pattern
+      minLength: integer
+      maxLength: integer
+      min: number
+      max: number
+      allowedValues: [string]
+
+# ============================================================================
+# EXECUTION
+# ============================================================================
+execution:
+  # Required: The command/script to run
+  # Use {{input_name}} for parameter interpolation
+  command: string  # e.g., "docker {{action}} {{container}}"
+  
+  # Or for multi-line scripts:
+  script: |
+    #!/bin/bash
+    set -e
+    echo "Running..."
+    {{custom_script}}
+  
+  # Optional: Execution mode
+  mode: string  # "sync" | "async" | "streaming"
+  
+  # Optional: Polling interval for async mode (ms)
+  pollInterval: integer  # default: 2000
+  
+  # Optional: Pre-execution validation script
+  preValidate: string  # Script that must exit 0 to proceed
+
+# ============================================================================
+# OUTPUT CONFIGURATION
+# ============================================================================
+output:
+  # Output type determines how results are displayed
+  type: string  # "text" | "json" | "table" | "html" | "video" | "report"
+  
+  # For structured outputs, define the expected shape
+  schema:
+    type: object
+    properties: {}
+  
+  # Optional: Extract specific values from output
+  extractors:
+    - name: string  # e.g., "videoPath"
+      pattern: string  # Regex with capture group
+      display: string  # How to display: "link" | "badge" | "hidden"
+  
+  # Optional: Artifact collection (files to save after execution)
+  artifacts:
+    - name: string
+      path: string  # Path inside container
+      type: string  # "video" | "html" | "json" | "log"
+      retention: string  # "24h" | "7d" | "30d" | "forever"
+
+# ============================================================================
+# UI CONFIGURATION
+# ============================================================================
+ui:
+  # Button configuration
+  button:
+    label: string  # e.g., "Run", "Execute", "Start Test"
+    icon: string   # e.g., "fas fa-play"
+    style: string  # "primary" | "success" | "warning" | "danger" | "info"
+  
+  # Optional: Show live output while running
+  showLiveOutput: boolean  # default: true
+  
+  # Optional: Auto-refresh results
+  autoRefresh:
+    enabled: boolean
+    interval: integer  # seconds
+  
+  # Optional: Confirmation dialog before execution
+  confirm:
+    enabled: boolean
+    message: string
+    requireReason: boolean  # User must provide a reason
+
+# ============================================================================
+# ACCESS CONTROL
+# ============================================================================
+access:
+  # Who can use this template
+  allowedRoles: [string]  # e.g., ["admin", "dev", "ops"]
+  
+  # Who can create commands from this template
+  createRoles: [string]  # e.g., ["admin"]
+  
+  # Optional: Require approval for execution
+  approval:
+    required: boolean
+    approvers: [string]  # Roles or specific users
+    minApprovals: integer

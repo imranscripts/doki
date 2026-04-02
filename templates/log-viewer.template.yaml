@@ -1,0 +1,91 @@
+# ============================================================================
+# LOG VIEWER TEMPLATE
+# ============================================================================
+# Shareable template for viewing logs.
+# NO paths, NO servers - just the tool definition.
+# ============================================================================
+
+id: log-viewer
+name: Log Viewer
+version: "1.0.0"
+description: View and tail log files
+
+icon: fas fa-file-alt
+color: "#FF5722"
+
+# ============================================================================
+# RUNTIME - Container this template runs in
+# ============================================================================
+runtime:
+  image: alpine:latest
+  # Orchestrator mounts log paths based on target
+
+# ============================================================================
+# INPUTS
+# ============================================================================
+inputs:
+  - name: logPath
+    label: Log Path
+    type: string
+    required: true
+    description: Path to log file or glob pattern
+    placeholder: "/var/log/app/*.log"
+    
+  - name: lines
+    label: Lines
+    type: number
+    required: false
+    default: 100
+    description: Number of lines to show
+    validation:
+      min: 10
+      max: 5000
+      
+  - name: follow
+    label: Follow (stream)
+    type: boolean
+    required: false
+    default: false
+    
+  - name: filter
+    label: Filter Pattern
+    type: string
+    required: false
+    description: Grep pattern to filter output
+
+# ============================================================================
+# EXECUTION
+# ============================================================================
+execution:
+  script: |
+    LOG_PATH="{{logPath}}"
+    LINES="{{lines}}"
+    FILTER="{{filter}}"
+    
+    if [ "{{follow}}" = "true" ]; then
+      CMD="tail -f -n $LINES"
+    else
+      CMD="tail -n $LINES"
+    fi
+    
+    if [ -n "$FILTER" ]; then
+      $CMD $LOG_PATH | grep -E "$FILTER"
+    else
+      $CMD $LOG_PATH
+    fi
+    
+  mode: streaming  # Supports follow mode
+  timeout: 300
+
+# ============================================================================
+# OUTPUT
+# ============================================================================
+output:
+  type: text
+
+# ============================================================================
+# REQUIREMENTS
+# ============================================================================
+requirements:
+  - tail
+  - grep

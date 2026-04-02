@@ -1,0 +1,154 @@
+# ============================================================================
+# DOCKER MANAGEMENT TEMPLATE
+# ============================================================================
+# A shareable, reusable template for Docker operations.
+# Contains NO infrastructure details - just the tool definition.
+# ============================================================================
+
+id: docker-management
+name: Docker Management
+version: "1.1.1"
+description: Manage Docker containers with clear list modes for running or all containers, plus start, stop, restart, logs, and inspect
+targetType: docker    # Requires a 'docker' type target from environment
+
+icon: fab fa-docker
+color: "#2496ED"
+
+# ============================================================================
+# RUNTIME - Container this template runs in
+# ============================================================================
+runtime:
+  image: docker:24-cli
+  # Docker socket will be mounted by orchestrator based on target
+
+# ============================================================================
+# INPUTS - What the user provides
+# ============================================================================
+inputs:
+  - name: action
+    label: Action
+    type: select
+    required: true
+    options:
+      - value: ps-running
+        label: List running containers
+      - value: ps-all
+        label: List all containers
+      - value: start
+        label: Start
+      - value: stop
+        label: Stop
+      - value: restart
+        label: Restart
+      - value: logs
+        label: View logs
+      - value: inspect
+        label: Inspect
+        
+  - name: container
+    label: Container
+    type: string
+    required: false
+    description: Container name or ID (not needed for list actions)
+    validation:
+      pattern: "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$"
+
+  - name: listFormat
+    label: List output format
+    type: select
+    required: false
+    default: table
+    description: For list actions, choose a human table or a workflow-friendly format
+    options:
+      - value: table
+        label: Table
+      - value: names
+        label: Names only
+      - value: jsonl
+        label: JSON lines
+      
+  - name: tail
+    label: Log lines
+    type: number
+    required: false
+    default: 100
+    description: Number of log lines to show
+    validation:
+      min: 1
+      max: 10000
+
+# ============================================================================
+# EXECUTION - What runs (target-agnostic)
+# ============================================================================
+execution:
+  # The orchestrator will wrap this in the appropriate context
+  # (SSH, docker exec, local shell, etc.) based on the TARGET
+  script: |
+    case "{{action}}" in
+      ps|ps-all|ps-running)
+        list_scope=""
+        case "{{action}}" in
+          ps|ps-all)
+            list_scope="-a"
+            ;;
+        esac
+
+        case "{{listFormat}}" in
+          ""|table)
+            printf 'NAME\tSTATUS\tIMAGE\n'
+            # Docker's Go template syntax uses {{.Field}} - it won't conflict with our {{inputName}} placeholders.
+            docker ps ${list_scope} --format '{{.Names}}\t{{.Status}}\t{{.Image}}'
+            ;;
+          names)
+            docker ps ${list_scope} --format '{{.Names}}'
+            ;;
+          jsonl)
+            docker ps ${list_scope} --format '{{json .}}'
+            ;;
+          *)
+            echo "Error: Unsupported list format {{listFormat}}"
+            exit 1
+            ;;
+        esac
+        ;;
+      start|stop|restart)
+        if [ -z "{{container}}" ]; then
+          echo "Error: Container name/ID required for {{action}}"
+          exit 1
+        fi
+        docker {{action}} {{container}}
+        echo "✅ Container {{action}} completed"
+        ;;
+      logs)
+        if [ -z "{{container}}" ]; then
+          echo "Error: Container name/ID required"
+          exit 1
+        fi
+        docker logs --tail {{tail}} {{container}}
+        ;;
+      inspect)
+        if [ -z "{{container}}" ]; then
+          echo "Error: Container name/ID required"
+          exit 1
+        fi
+        docker inspect {{container}} | jq '.[0] | {Name, State, Config: {Image}}'
+        ;;
+    esac
+    
+  # Execution modes
+  mode: sync  # sync | async | streaming
+  timeout: 120
+
+# ============================================================================
+# OUTPUT - How to display results
+# ============================================================================
+output:
+  type: text
+  
+# ============================================================================
+# REQUIREMENTS - What the target must provide
+# ============================================================================
+# The orchestrator checks these against the target's capabilities
+requirements:
+  - docker  # Target must have docker CLI available
+  - jq      # For inspect output formatting (optional)

@@ -1,0 +1,12 @@
+# Suggestions
+
+- Stop tracking live install data in git. At minimum remove `app/data/keys/secrets.key`, `app/data/keys/stealth.secret`, and `app/data/users/*/app-preferences.yaml` from version control and ignore them.
+- Extend the runtime-data ignore rules so generated files under `app/data/apps/`, `app/data/app-build-status/`, and similar mutable folders do not ship in the repo.
+- Remove the fresh-install default admin seeding from `Database::seedDefaultUsers()`. Create schema only, then block normal app usage until onboarding creates the first `super-admin`.
+- Remove the default credential hint from the login page once onboarding exists.
+- Add an explicit bootstrap/install state in the database or a small state file so `setup.sh` and onboarding are idempotent, resumable, and testable.
+- Keep `setup.sh` non-interactive and repeatable. Good flags would be `--check`, `--init`, and `--rotate-keys`.
+- Keep the in-app onboarding short: first admin, stealth/security choice, first target, optional environment, then finish.
+- Route fresh installs to onboarding before normal stealth/login behavior; otherwise first-run UX will be confusing.
+- Add onboarding health checks for Docker socket access, Go orchestrator reachability, writable data directories, and required PHP extensions.
+- Consider storing mutable runtime data outside the repo working tree in deployed environments so app state and source code are separated cleanly.

@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  php-app:
+    build: .
+    container_name: doki-main-app
+    # Note: Running as root to allow Docker socket access
+    # For production, configure proper group permissions
+    environment:
+      # Host path mapping for Docker-in-Docker volume mounts
+      - HOST_APP_PATH=${PWD}/app
+      - HOST_DOCKER_PATH=${PWD}/docker
+      - DOKI_GO_ORCH_ENABLED=${DOKI_GO_ORCH_ENABLED:-1}
+      - DOKI_ORCH_URL=${DOKI_ORCH_URL:-http://go-orchestrator:8098}
+      - DOKI_ORCH_TOKEN=${DOKI_ORCH_TOKEN:-dev-insecure}
+    volumes:
+      - ./app:/var/www/html:rw,z
+      - ./templates:/var/www/templates:ro  # Templates are read-only
+      - ./infrastructure:/var/www/infrastructure:ro  # Infrastructure examples
+      - ./docker:/var/www/docker:ro  # Docker build files for runner images
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/log/apache2:/var/serverlogs:ro
+      - /:/host_root:ro  # Gives read-only access to the entire host filesystem
+    ports:
+      - "8099:80"
+    restart: unless-stopped
+    privileged: true
+
+  go-orchestrator:
+    build: ./orchestrator-go
+    container_name: doki-go-orchestrator
+    environment:
+      - ORCH_LISTEN_ADDR=:8098
+      - ORCH_CONTROL_PLANE_URL=http://php-app
+      - DOKI_ORCH_TOKEN=${DOKI_ORCH_TOKEN:-dev-insecure}
+      - ORCH_APP_DIR=/var/www/html
+      - HOST_APP_PATH=${PWD}/app
+    volumes:
+      - ./app:/var/www/html:rw,z
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "${DOKI_ORCH_HOST_PORT:-8098}:8098"
+    depends_on:
+      - php-app
+    restart: unless-stopped
+    privileged: true

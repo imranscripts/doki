@@ -1,0 +1,121 @@
+# ============================================================================
+# JSON COUNT TEMPLATE
+# ============================================================================
+# Count items in a JSON array or at a dotted path within a JSON document.
+# Useful for API workflows that need totals without ad-hoc scripting.
+# ============================================================================
+
+id: json-count
+name: JSON Count
+version: "1.0.0"
+description: Count items in a JSON array or nested collection
+
+icon: fas fa-list-ol
+color: "#0EA5A6"
+
+# ============================================================================
+# RUNTIME
+# ============================================================================
+runtime:
+  image: python:3.12-alpine
+
+# ============================================================================
+# INPUTS
+# ============================================================================
+inputs:
+  - name: json
+    label: JSON Text
+    type: string
+    required: true
+    description: Raw JSON string to parse
+
+  - name: path
+    label: Field Path
+    type: string
+    required: false
+    description: Optional dot path to the array or object to count
+    placeholder: "items"
+
+  - name: defaultValue
+    label: Default Value
+    type: string
+    required: false
+    default: "0"
+    description: Value to print if the path is missing
+
+# ============================================================================
+# EXECUTION
+# ============================================================================
+execution:
+  script: |
+    #!/bin/sh
+    set -eu
+
+    python3 - <<'PY'
+    import json
+    import os
+    import sys
+
+    raw = os.environ.get("INPUT_JSON", "")
+    path = os.environ.get("INPUT_PATH", "").strip()
+    default = os.environ.get("INPUT_DEFAULTVALUE", "0")
+
+    def write_value(value):
+        sys.stdout.write(str(value))
+
+    if raw == "":
+        write_value(default)
+        sys.exit(0)
+
+    try:
+        data = json.loads(raw)
+    except Exception as exc:
+        print(f"Invalid JSON input: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    def read_path(value, dotted_path):
+        if dotted_path == "":
+            return value
+        current = value
+        for segment in dotted_path.split("."):
+            segment = segment.strip()
+            if segment == "":
+                continue
+            if isinstance(current, list):
+                index = int(segment)
+                current = current[index]
+                continue
+            if isinstance(current, dict):
+                current = current[segment]
+                continue
+            raise KeyError(segment)
+        return current
+
+    try:
+        result = read_path(data, path)
+    except Exception:
+        write_value(default)
+        sys.exit(0)
+
+    if isinstance(result, (list, dict, str)):
+        write_value(len(result))
+    elif result is None:
+        write_value(default)
+    else:
+        write_value(1)
+    PY
+
+  mode: sync
+  timeout: 30
+
+# ============================================================================
+# OUTPUT
+# ============================================================================
+output:
+  type: text
+
+# ============================================================================
+# REQUIREMENTS
+# ============================================================================
+requirements:
+  - python3

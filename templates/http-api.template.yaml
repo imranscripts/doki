@@ -1,0 +1,186 @@
+# ============================================================================
+# HTTP API TEMPLATE
+# ============================================================================
+# Full-featured HTTP API template with target baseUrl support.
+# - With HTTP target: baseUrl from target + path from input
+# - Without target: use full URL in path input
+# ============================================================================
+
+id: http-api
+name: HTTP API Call
+category: Integration
+description: Make HTTP requests to APIs, webhooks, and services
+targetType: http    # Maps to 'http' target in environment
+icon: fas fa-plug
+color: "#FF9800"
+
+# ----------------------------------------------------------------------------
+# RUNTIME
+# ----------------------------------------------------------------------------
+runtime:
+  image: alpine/curl:latest
+  resources:
+    memory: 32m
+    cpu: "0.1"
+    timeout: 30
+  network: host
+
+# ----------------------------------------------------------------------------
+# INPUTS
+# ----------------------------------------------------------------------------
+inputs:
+  - name: method
+    label: HTTP Method
+    type: select
+    required: true
+    default: GET
+    options:
+      - value: GET
+        label: GET
+      - value: POST
+        label: POST
+      - value: PUT
+        label: PUT
+      - value: PATCH
+        label: PATCH
+      - value: DELETE
+        label: DELETE
+
+  - name: path
+    label: Path / URL
+    type: string
+    required: true
+    placeholder: "/api/endpoint"
+    description: "Endpoint path (e.g., /users) or full URL if no HTTP target"
+
+  - name: body
+    label: Request Body
+    type: string
+    required: false
+    placeholder: '{"key": "value"}'
+    description: Request body (for POST/PUT/PATCH)
+
+  - name: timeout
+    label: Timeout (seconds)
+    type: number
+    required: false
+    default: 10
+    validation:
+      min: 1
+      max: 60
+
+  - name: followRedirects
+    label: Follow Redirects
+    type: boolean
+    required: false
+    default: true
+
+  - name: insecure
+    label: Skip SSL Verification
+    type: boolean
+    required: false
+    default: false
+    description: ⚠️ Only use for testing with self-signed certs
+
+# ----------------------------------------------------------------------------
+# EXECUTION
+# ----------------------------------------------------------------------------
+execution:
+  mode: sync
+  script: |
+    #!/bin/sh
+    set -e
+
+    # Build URL: HTTP_ENDPOINT (from target) + path (from input)
+    BASE_URL="${HTTP_ENDPOINT:-}"
+    PATH_INPUT="{{path}}"
+    PATH_INPUT=$(printf '%s' "$PATH_INPUT" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+    if [ -n "$BASE_URL" ]; then
+      BASE_URL=$(echo "$BASE_URL" | sed 's:/*$::')
+      if echo "$PATH_INPUT" | grep -qE '^https?://'; then
+        FINAL_URL="$PATH_INPUT"
+      else
+        case "$PATH_INPUT" in
+          /*) FINAL_URL="${BASE_URL}${PATH_INPUT}" ;;
+          *)  FINAL_URL="${BASE_URL}/${PATH_INPUT}" ;;
+        esac
+      fi
+    else
+      FINAL_URL="$PATH_INPUT"
+    fi
+
+    echo "🌐 {{method}} $FINAL_URL"
+    echo "========================"
+    echo ""
+
+    # Resolve timeout (fallback to 10 if empty or non-numeric)
+    TIMEOUT="{{timeout}}"
+    case "$TIMEOUT" in ''|*[!0-9]*) TIMEOUT=10 ;; esac
+
+    # Build curl args using positional params (avoids eval quoting issues)
+    set -- -sS -X {{method}} --max-time "$TIMEOUT" -H 'Accept: application/json'
+
+    # Auth injected by orchestrator from HTTP target
+    if [ "$HTTP_AUTH_TYPE" = "bearer" ] && [ -n "$HTTP_AUTH_TOKEN" ]; then
+      set -- "$@" -H "Authorization: Bearer $HTTP_AUTH_TOKEN"
+    elif [ "$HTTP_AUTH_TYPE" = "basic" ] && [ -n "$HTTP_AUTH_USERNAME" ]; then
+      set -- "$@" -u "$HTTP_AUTH_USERNAME:$HTTP_AUTH_PASSWORD"
+    fi
+
+    {{#if followRedirects}}
+    set -- "$@" -L
+    {{/if}}
+
+    {{#if insecure}}
+    set -- "$@" -k
+    {{/if}}
+
+    {{#if body}}
+    set -- "$@" -H 'Content-Type: application/json' -d '{{body}}'
+    {{/if}}
+
+    # Execute: capture body to file, status code to variable
+    TMPFILE=$(mktemp)
+    HTTP_STATUS=$(curl "$@" -w '%{http_code}' -o "$TMPFILE" "$FINAL_URL")
+    BODY=$(cat "$TMPFILE")
+    rm -f "$TMPFILE"
+
+    # Pretty-print JSON if possible
+    if command -v jq >/dev/null 2>&1; then
+      echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+    else
+      echo "$BODY"
+    fi
+
+    echo ""
+    echo "──────────────────────────"
+
+    # Status badge
+    if [ "$HTTP_STATUS" -ge 200 ] 2>/dev/null && [ "$HTTP_STATUS" -lt 300 ] 2>/dev/null; then
+      echo "✅ Status: $HTTP_STATUS"
+    elif [ "$HTTP_STATUS" -ge 400 ] 2>/dev/null; then
+      echo "❌ Status: $HTTP_STATUS"
+      exit 1
+    else
+      echo "ℹ️ Status: $HTTP_STATUS"
+    fi
+
+# ----------------------------------------------------------------------------
+# OUTPUT
+# ----------------------------------------------------------------------------
+output:
+  type: json
+  extractors:
+    - name: responseBody
+      pattern: '(?s)^.*?\n=+\n(.*?)\n\n[─-]{10,}'
+      display: hidden
+    - name: statusCode
+      pattern: 'Status: ([0-9]{3})'
+      display: badge
+
+# ----------------------------------------------------------------------------
+# NOTES
+# ----------------------------------------------------------------------------
+# HTTP_ENDPOINT, HTTP_AUTH_TYPE, HTTP_AUTH_TOKEN, HTTP_AUTH_USERNAME,
+# HTTP_AUTH_PASSWORD are injected by the orchestrator from the HTTP target.

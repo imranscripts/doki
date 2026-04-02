@@ -1,0 +1,235 @@
+# ============================================================================
+# API CONTRACT SMOKE TEST TEMPLATE
+# ============================================================================
+# Validate a live API response against a lightweight contract.
+# ============================================================================
+
+id: api-contract-smoke-test
+name: API Contract Smoke Test
+version: "1.0.0"
+description: Check a live API endpoint for expected status, latency, text, and required or forbidden JSON fields
+
+icon: fas fa-vial-circle-check
+color: "#0F766E"
+
+runtime:
+  image: python:3.12-alpine
+  network: host
+
+inputs:
+  - name: url
+    label: URL
+    type: string
+    required: true
+    description: Full URL for the endpoint to test
+    placeholder: "https://jsonplaceholder.typicode.com/users/1"
+
+  - name: method
+    label: Method
+    type: select
+    required: false
+    default: GET
+    options:
+      - value: GET
+        label: GET
+      - value: POST
+        label: POST
+      - value: PUT
+        label: PUT
+      - value: PATCH
+        label: PATCH
+      - value: DELETE
+        label: DELETE
+
+  - name: expectedStatus
+    label: Expected Status
+    type: number
+    required: false
+    default: 200
+    validation:
+      min: 100
+      max: 599
+
+  - name: maxLatencyMs
+    label: Max Latency (ms)
+    type: number
+    required: false
+    default: 2000
+    validation:
+      min: 1
+      max: 120000
+
+  - name: requiredJsonFields
+    label: Required JSON Fields
+    type: string
+    required: false
+    description: Comma-separated dotted paths that must exist
+    placeholder: "id,name,company.name"
+
+  - name: forbiddenJsonFields
+    label: Forbidden JSON Fields
+    type: string
+    required: false
+    description: Comma-separated dotted paths that must not exist
+    placeholder: "error,debug.stack"
+
+  - name: containsText
+    label: Body Must Contain
+    type: string
+    required: false
+    description: Text that must appear in the response body
+
+  - name: headers
+    label: Extra Headers
+    type: string
+    required: false
+    description: "Additional headers (format: Header1:Value1,Header2:Value2)"
+
+  - name: body
+    label: Request Body
+    type: string
+    required: false
+    description: Optional raw request body
+
+execution:
+  script: |
+    #!/bin/sh
+    set -eu
+
+    python3 - <<'PY'
+    import json
+    import os
+    import sys
+    import time
+    import urllib.error
+    import urllib.request
+
+    url = os.environ.get("INPUT_URL", "").strip()
+    method = (os.environ.get("INPUT_METHOD", "GET") or "GET").strip().upper()
+    expected_status = int(os.environ.get("INPUT_EXPECTEDSTATUS", "200") or "200")
+    max_latency_ms = int(os.environ.get("INPUT_MAXLATENCYMS", "2000") or "2000")
+    contains_text = os.environ.get("INPUT_CONTAINSTEXT", "")
+    required_fields = [item.strip() for item in os.environ.get("INPUT_REQUIREDJSONFIELDS", "").split(",") if item.strip()]
+    forbidden_fields = [item.strip() for item in os.environ.get("INPUT_FORBIDDENJSONFIELDS", "").split(",") if item.strip()]
+    raw_headers = os.environ.get("INPUT_HEADERS", "")
+    raw_body = os.environ.get("INPUT_BODY", "")
+
+    if not url:
+        print("URL is required.", file=sys.stderr)
+        sys.exit(1)
+
+    headers = {"User-Agent": "doki-template/api-contract-smoke-test"}
+    if raw_headers.strip():
+        for chunk in raw_headers.split(","):
+            if ":" not in chunk:
+                continue
+            key, value = chunk.split(":", 1)
+            headers[key.strip()] = value.strip()
+
+    body = raw_body.encode("utf-8") if raw_body else None
+    request = urllib.request.Request(url, data=body, headers=headers, method=method)
+
+    start = time.perf_counter()
+    status = None
+    response_headers = {}
+    body_text = ""
+    errors = []
+
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            status = response.status
+            response_headers = dict(response.headers.items())
+            body_text = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        status = exc.code
+        response_headers = dict(exc.headers.items())
+        body_text = exc.read().decode("utf-8", errors="replace")
+    except Exception as exc:
+        print(f"Request failed: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    latency_ms = round((time.perf_counter() - start) * 1000, 1)
+
+    if status != expected_status:
+        errors.append(f"Expected status {expected_status}, got {status}")
+    if latency_ms > max_latency_ms:
+        errors.append(f"Latency {latency_ms}ms exceeded budget of {max_latency_ms}ms")
+    if contains_text and contains_text not in body_text:
+        errors.append(f"Body did not contain expected text: {contains_text}")
+
+    payload = None
+    if required_fields or forbidden_fields:
+        try:
+            payload = json.loads(body_text)
+        except Exception as exc:
+            errors.append(f"Response was not valid JSON: {exc}")
+
+    def read_path(value, dotted_path):
+        current = value
+        for segment in dotted_path.split("."):
+            segment = segment.strip()
+            if not segment:
+                continue
+            if isinstance(current, list):
+                current = current[int(segment)]
+            elif isinstance(current, dict):
+                current = current[segment]
+            else:
+                raise KeyError(segment)
+        return current
+
+    if payload is not None:
+        for field in required_fields:
+            try:
+                read_path(payload, field)
+            except Exception:
+                errors.append(f"Missing required JSON field: {field}")
+
+        for field in forbidden_fields:
+            try:
+                read_path(payload, field)
+            except Exception:
+                continue
+            errors.append(f"Forbidden JSON field was present: {field}")
+
+    preview = body_text.strip().replace("\r", "")
+    if len(preview) > 600:
+      preview = preview[:600] + "..."
+
+    print("API Contract Smoke Test")
+    print("=======================")
+    print(f"URL: {url}")
+    print(f"Method: {method}")
+    print(f"Status: {status}")
+    print(f"Latency: {latency_ms}ms")
+    print(f"Content-Type: {response_headers.get('Content-Type', 'unknown')}")
+    print(f"Required JSON fields: {len(required_fields)}")
+    print(f"Forbidden JSON fields: {len(forbidden_fields)}")
+    print("")
+
+    if errors:
+        print("Result: FAIL")
+        print("")
+        print("Contract issues:")
+        for issue in errors:
+            print(f"- {issue}")
+        print("")
+    else:
+        print("Result: PASS")
+        print("")
+
+    print("Response preview:")
+    print(preview or "(empty response)")
+
+    if errors:
+        sys.exit(1)
+    PY
+
+  mode: sync
+  timeout: 45
+
+output:
+  type: text
+
+requirements:
+  - python3

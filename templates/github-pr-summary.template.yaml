@@ -1,0 +1,138 @@
+# ============================================================================
+# GITHUB PR SUMMARY TEMPLATE
+# ============================================================================
+# Fetch a pull request summary from the GitHub API.
+# ============================================================================
+
+id: github-pr-summary
+name: GitHub PR Summary
+version: "1.0.0"
+description: Fetch a GitHub pull request summary with title, author, labels, change stats, and top changed files
+
+icon: fab fa-github
+color: "#111827"
+
+runtime:
+  image: python:3.12-alpine
+  network: host
+
+inputs:
+  - name: repo
+    label: Repository
+    type: string
+    required: true
+    description: Repository in owner/name format
+    placeholder: "openai/openai-python"
+    validation:
+      pattern: "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+
+  - name: prNumber
+    label: Pull Request Number
+    type: number
+    required: true
+    description: GitHub pull request number
+    validation:
+      min: 1
+
+  - name: maxFiles
+    label: Changed Files To Show
+    type: number
+    required: false
+    default: 10
+    description: Maximum changed files to include in the summary
+    validation:
+      min: 0
+      max: 50
+
+execution:
+  script: |
+    #!/bin/sh
+    set -eu
+
+    python3 - <<'PY'
+    import json
+    import os
+    import sys
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    repo = os.environ.get("INPUT_REPO", "").strip()
+    pr_number = str(os.environ.get("INPUT_PRNUMBER", "")).strip()
+    max_files = int(os.environ.get("INPUT_MAXFILES", "10") or "10")
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+
+    if not repo or not pr_number:
+        print("Repository and pull request number are required.", file=sys.stderr)
+        sys.exit(1)
+
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "doki-template/github-pr-summary",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    def get_json(url: str):
+        request = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                payload = response.read().decode("utf-8")
+                return json.loads(payload)
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            print(f"GitHub API request failed: {exc.code} {exc.reason}", file=sys.stderr)
+            if body:
+                print(body, file=sys.stderr)
+            sys.exit(1)
+        except Exception as exc:
+            print(f"GitHub API request failed: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+    pr = get_json(f"https://api.github.com/repos/{repo}/pulls/{pr_number}")
+    files = []
+    if max_files > 0:
+        files = get_json(
+            f"https://api.github.com/repos/{repo}/pulls/{pr_number}/files?per_page={min(max_files, 100)}"
+        )
+
+    labels = ", ".join(label.get("name", "") for label in pr.get("labels", []) if label.get("name")) or "none"
+    state = pr.get("state", "unknown")
+    if pr.get("merged_at"):
+        state = "merged"
+    draft = "yes" if pr.get("draft") else "no"
+
+    print("GitHub PR Summary")
+    print("=================")
+    print(f"Repository: {repo}")
+    print(f"PR: #{pr_number} - {pr.get('title', 'Untitled PR')}")
+    print(f"State: {state}")
+    print(f"Draft: {draft}")
+    print(f"Author: {(pr.get('user') or {}).get('login', 'unknown')}")
+    print(f"Branch: {((pr.get('head') or {}).get('ref', 'unknown'))} -> {((pr.get('base') or {}).get('ref', 'unknown'))}")
+    print(f"Labels: {labels}")
+    print(f"Commits: {pr.get('commits', 0)}")
+    print(f"Changed files: {pr.get('changed_files', 0)}")
+    print(f"Additions: {pr.get('additions', 0)}")
+    print(f"Deletions: {pr.get('deletions', 0)}")
+    print(f"URL: {pr.get('html_url', '')}")
+
+    if files:
+        print("")
+        print("Top changed files:")
+        for item in files:
+            filename = item.get("filename", "(unknown file)")
+            status = item.get("status", "modified")
+            additions = item.get("additions", 0)
+            deletions = item.get("deletions", 0)
+            print(f"- {filename} [{status}, +{additions}/-{deletions}]")
+    PY
+
+  mode: sync
+  timeout: 45
+
+output:
+  type: text
+
+requirements:
+  - python3

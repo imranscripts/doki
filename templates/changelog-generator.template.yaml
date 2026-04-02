@@ -1,0 +1,157 @@
+# ============================================================================
+# CHANGELOG GENERATOR TEMPLATE
+# ============================================================================
+# Build a lightweight changelog from local git commit history.
+# ============================================================================
+
+id: changelog-generator
+name: Changelog Generator
+version: "1.0.0"
+description: Generate a lightweight markdown or plain-text changelog from a local git range
+
+icon: fas fa-scroll
+color: "#7C3AED"
+
+runtime:
+  image: alpine/git:2.47.2
+  workdir: /workspace/repo
+  volumes:
+    - host: "${INPUT_REPOPATH}"
+      container: /workspace/repo
+      readonly: true
+
+inputs:
+  - name: repoPath
+    label: Repository Path
+    type: string
+    required: true
+    description: Absolute path to the local git repository on the machine running Doki
+    placeholder: "/Users/you/projects/service-api"
+
+  - name: fromRef
+    label: From Ref
+    type: string
+    required: true
+    description: Older git ref for the changelog range
+    placeholder: "v1.2.0"
+
+  - name: toRef
+    label: To Ref
+    type: string
+    required: false
+    default: HEAD
+    description: Newer git ref for the changelog range
+
+  - name: format
+    label: Output Format
+    type: select
+    required: false
+    default: markdown
+    options:
+      - value: markdown
+        label: Markdown
+      - value: plain
+        label: Plain text
+
+  - name: limit
+    label: Max Commits
+    type: number
+    required: false
+    default: 50
+    description: Maximum number of commits to include
+    validation:
+      min: 1
+      max: 500
+
+execution:
+  script: |
+    #!/bin/sh
+    set -eu
+
+    FROM_REF="${INPUT_FROMREF:-}"
+    TO_REF="${INPUT_TOREF:-HEAD}"
+    FORMAT="${INPUT_FORMAT:-markdown}"
+    LIMIT="${INPUT_LIMIT:-50}"
+
+    cd /workspace/repo
+
+    if ! git rev-parse --git-dir >/dev/null 2>&1; then
+      echo "Not a git repository: ${INPUT_REPOPATH:-/workspace/repo}"
+      exit 1
+    fi
+
+    if [ -z "$FROM_REF" ]; then
+      echo "fromRef is required"
+      exit 1
+    fi
+
+    TMP="$(mktemp)"
+    trap 'rm -f "$TMP"' EXIT
+
+    git log --no-merges --pretty=format:'%s	%an	%h' "${FROM_REF}..${TO_REF}" | head -n "$LIMIT" > "$TMP"
+
+    if ! grep -q . "$TMP"; then
+      echo "No commits found for range ${FROM_REF}..${TO_REF}"
+      exit 0
+    fi
+
+    FEATURES=""
+    FIXES=""
+    DOCS=""
+    CHORES=""
+    OTHER=""
+
+    while IFS='	' read -r subject author sha; do
+      [ -n "$subject" ] || continue
+      lower_subject="$(printf '%s' "$subject" | tr '[:upper:]' '[:lower:]')"
+      line="- ${subject} (${sha} by ${author})\n"
+      case "$lower_subject" in
+        feat:*|feature:*|add:* )
+          FEATURES="${FEATURES}${line}"
+          ;;
+        fix:*|bugfix:*|hotfix:* )
+          FIXES="${FIXES}${line}"
+          ;;
+        docs:*|doc:* )
+          DOCS="${DOCS}${line}"
+          ;;
+        chore:*|build:*|ci:*|refactor:*|test:*|perf:* )
+          CHORES="${CHORES}${line}"
+          ;;
+        * )
+          OTHER="${OTHER}${line}"
+          ;;
+      esac
+    done < "$TMP"
+
+    if [ "$FORMAT" = "plain" ]; then
+      echo "Changelog"
+      echo "========="
+      echo "Range: ${FROM_REF}..${TO_REF}"
+      echo ""
+      [ -n "$FEATURES" ] && { echo "Features"; printf "%b" "$FEATURES"; echo ""; }
+      [ -n "$FIXES" ] && { echo "Fixes"; printf "%b" "$FIXES"; echo ""; }
+      [ -n "$DOCS" ] && { echo "Docs"; printf "%b" "$DOCS"; echo ""; }
+      [ -n "$CHORES" ] && { echo "Chores"; printf "%b" "$CHORES"; echo ""; }
+      [ -n "$OTHER" ] && { echo "Other"; printf "%b" "$OTHER"; }
+      exit 0
+    fi
+
+    echo "# Changelog"
+    echo ""
+    echo "Range: \`${FROM_REF}..${TO_REF}\`"
+    echo ""
+    [ -n "$FEATURES" ] && { echo "## Features"; printf "%b" "$FEATURES"; echo ""; }
+    [ -n "$FIXES" ] && { echo "## Fixes"; printf "%b" "$FIXES"; echo ""; }
+    [ -n "$DOCS" ] && { echo "## Docs"; printf "%b" "$DOCS"; echo ""; }
+    [ -n "$CHORES" ] && { echo "## Chores"; printf "%b" "$CHORES"; echo ""; }
+    [ -n "$OTHER" ] && { echo "## Other"; printf "%b" "$OTHER"; }
+
+  mode: sync
+  timeout: 60
+
+output:
+  type: text
+
+requirements:
+  - git

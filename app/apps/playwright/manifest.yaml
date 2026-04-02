@@ -1,0 +1,45 @@
+# Playwright App Manifest
+# This defines the app's metadata and navigation structure
+
+id: playwright
+name: Playwright
+description: End-to-end testing with Playwright
+icon: fa-masks-theater
+color: "#a855f7"
+version: 1.0.0
+enabled: true
+core: true  # Built-in app with full trust
+
+# Tags for organization and discovery
+tags:
+  - testing
+  - automation
+  - core
+  - e2e
+
+# Capabilities this app uses
+capabilities:
+  - config.targets
+  - config.environments
+  - config.secrets
+  - exec.docker
+  - git.providers
+
+navigation:
+  - id: projects
+    label: Projects
+    icon: fa-folder-tree
+    page: index.php
+  - id: reports
+    label: Reports
+    icon: fa-chart-bar
+    page: reports.php
+  - id: settings
+    label: Settings
+    icon: fa-cog
+    page: settings.php
+    adminOnly: true
+
+permissions:
+  admin: [read, write, settings, run]
+  user: [read, run]

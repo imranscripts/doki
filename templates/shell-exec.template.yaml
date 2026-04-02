@@ -1,0 +1,59 @@
+# ============================================================================
+# SHELL EXEC TEMPLATE
+# ============================================================================
+# Generic shell command execution.
+# The most basic template - just runs a command.
+# ============================================================================
+
+id: shell-exec
+name: Shell Command
+version: "1.0.0"
+description: Execute shell commands
+
+icon: fas fa-terminal
+color: "#424242"
+
+# ============================================================================
+# RUNTIME - Container this template runs in
+# ============================================================================
+runtime:
+  image: alpine:latest
+  # Basic shell environment
+
+# ============================================================================
+# INPUTS
+# ============================================================================
+inputs:
+  - name: command
+    label: Command
+    type: string
+    required: true
+    description: Shell command to execute
+    validation:
+      maxLength: 8000
+      # Block dangerous patterns (orchestrator should also validate)
+      disallowedPatterns:
+        - "rm -rf /"
+        - "> /dev/sd"
+
+# ============================================================================
+# EXECUTION
+# ============================================================================
+execution:
+  script: |
+    {{command}}
+    
+  mode: sync
+  timeout: 60
+
+# ============================================================================
+# OUTPUT
+# ============================================================================
+output:
+  type: text
+
+# ============================================================================
+# REQUIREMENTS
+# ============================================================================
+requirements:
+  - sh

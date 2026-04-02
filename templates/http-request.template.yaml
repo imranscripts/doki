@@ -1,0 +1,166 @@
+# ============================================================================
+# HTTP REQUEST TEMPLATE
+# ============================================================================
+# HTTP request template that uses target's baseUrl.
+# - With HTTP target: baseUrl from target + path from input
+# - Without target: use full URL in path input
+# ============================================================================
+
+id: http-request
+name: HTTP Request
+version: "2.0.0"
+description: Make HTTP requests to APIs
+targetType: http    # Maps to 'http' target in environment
+
+icon: fas fa-globe
+color: "#FF9800"
+
+# ============================================================================
+# RUNTIME - Container this template runs in
+# ============================================================================
+runtime:
+  image: alpine/curl:latest
+  network: host  # Need network access to make HTTP calls
+
+# ============================================================================
+# INPUTS
+# ============================================================================
+inputs:
+  - name: path
+    label: Path / URL
+    type: string
+    required: true
+    description: "Endpoint path (e.g., /users/123) or full URL if no HTTP target"
+    placeholder: "/api/endpoint"
+
+  - name: method
+    label: Method
+    type: select
+    required: true
+    default: GET
+    options:
+      - value: GET
+        label: GET
+      - value: POST
+        label: POST
+      - value: PUT
+        label: PUT
+      - value: DELETE
+        label: DELETE
+      - value: PATCH
+        label: PATCH
+
+  - name: body
+    label: Request Body
+    type: string
+    required: false
+    description: JSON body for POST/PUT/PATCH
+
+  - name: headers
+    label: Extra Headers
+    type: string
+    required: false
+    description: "Additional headers (format: Header1:Value1,Header2:Value2)"
+
+# ============================================================================
+# EXECUTION
+# ============================================================================
+execution:
+  script: |
+    #!/bin/sh
+    set -e
+
+    # Build URL: HTTP_ENDPOINT (from target) + path (from input)
+    BASE_URL="${HTTP_ENDPOINT:-}"
+    PATH_INPUT="{{path}}"
+    PATH_INPUT=$(printf '%s' "$PATH_INPUT" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+    if [ -n "$BASE_URL" ]; then
+      BASE_URL=$(echo "$BASE_URL" | sed 's:/*$::')
+      if echo "$PATH_INPUT" | grep -qE '^https?://'; then
+        FINAL_URL="$PATH_INPUT"
+      else
+        case "$PATH_INPUT" in
+          /*) FINAL_URL="${BASE_URL}${PATH_INPUT}" ;;
+          *)  FINAL_URL="${BASE_URL}/${PATH_INPUT}" ;;
+        esac
+      fi
+    else
+      FINAL_URL="$PATH_INPUT"
+    fi
+
+    echo "🌐 {{method}} $FINAL_URL"
+    echo "========================"
+
+    # Build curl args using positional params (avoids eval quoting issues)
+    set -- -sS -X {{method}} -H 'Accept: application/json'
+
+    # Auth from target (HTTP_AUTH_TYPE, HTTP_AUTH_TOKEN, etc.)
+    if [ "$HTTP_AUTH_TYPE" = "bearer" ] && [ -n "$HTTP_AUTH_TOKEN" ]; then
+      set -- "$@" -H "Authorization: Bearer $HTTP_AUTH_TOKEN"
+    elif [ "$HTTP_AUTH_TYPE" = "basic" ] && [ -n "$HTTP_AUTH_USERNAME" ]; then
+      set -- "$@" -u "$HTTP_AUTH_USERNAME:$HTTP_AUTH_PASSWORD"
+    fi
+
+    # Extra headers from input (comma-separated: Header1:Value1,Header2:Value2)
+    {{#if headers}}
+    _OLD_IFS="$IFS"; IFS=','
+    for _H in {{headers}}; do
+      _H=$(echo "$_H" | sed 's/^ *//;s/ *$//')
+      [ -n "$_H" ] && set -- "$@" -H "$_H"
+    done
+    IFS="$_OLD_IFS"
+    {{/if}}
+
+    # Request body
+    {{#if body}}
+    set -- "$@" -H 'Content-Type: application/json' -d '{{body}}'
+    {{/if}}
+
+    # Execute: capture body to file, status code to variable
+    TMPFILE=$(mktemp)
+    HTTP_CODE=$(curl "$@" -w '%{http_code}' -o "$TMPFILE" "$FINAL_URL")
+    BODY=$(cat "$TMPFILE")
+    rm -f "$TMPFILE"
+
+    # Pretty print JSON if possible
+    if command -v jq >/dev/null 2>&1; then
+      echo "$BODY" | jq '.' 2>/dev/null || echo "$BODY"
+    else
+      echo "$BODY"
+    fi
+
+    echo ""
+    echo "──────────────────────────"
+
+    # Status badge
+    if [ "$HTTP_CODE" -ge 200 ] 2>/dev/null && [ "$HTTP_CODE" -lt 300 ] 2>/dev/null; then
+      echo "✅ Status: $HTTP_CODE"
+    elif [ "$HTTP_CODE" -ge 400 ] 2>/dev/null; then
+      echo "❌ Status: $HTTP_CODE"
+      exit 1
+    else
+      echo "ℹ️ Status: $HTTP_CODE"
+    fi
+
+  mode: sync
+  timeout: 30
+
+# ============================================================================
+# OUTPUT
+# ============================================================================
+output:
+  type: json
+  extractors:
+    - name: responseBody
+      pattern: '(?s)^.*?\n=+\n(.*?)\n\n[─-]{10,}'
+      display: hidden
+    - name: statusCode
+      pattern: 'Status: ([0-9]{3})'
+      display: badge
+
+# ============================================================================
+# NOTES
+# ============================================================================
+# HTTP_ENDPOINT, HTTP_AUTH_TYPE, HTTP_AUTH_TOKEN, HTTP_AUTH_USERNAME,
+# HTTP_AUTH_PASSWORD are injected by the orchestrator from the HTTP target.

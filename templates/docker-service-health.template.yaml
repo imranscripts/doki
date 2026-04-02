@@ -1,0 +1,83 @@
+# ============================================================================
+# DOCKER SERVICE HEALTH TEMPLATE
+# ============================================================================
+# Summarize the health of running Docker services on a local or Docker target.
+# ============================================================================
+
+id: docker-service-health
+name: Docker Service Health
+version: "1.0.0"
+description: Summarize running containers, unhealthy services, restart loops, and the first few container names
+targetType: docker
+
+icon: fas fa-heart-pulse
+color: "#1D4ED8"
+
+runtime:
+  image: docker:24-cli
+
+inputs:
+  - name: nameFilter
+    label: Name Filter
+    type: string
+    required: false
+    description: Optional grep-style filter for container names
+    placeholder: "doki|nginx|api"
+
+  - name: limit
+    label: Containers To Show
+    type: number
+    required: false
+    default: 5
+    description: Number of container names to include in the summary
+    validation:
+      min: 1
+      max: 20
+
+execution:
+  script: |
+    #!/bin/sh
+    set -eu
+
+    FILTER="${INPUT_NAMEFILTER:-}"
+    LIMIT="${INPUT_LIMIT:-5}"
+    TMP="$(mktemp)"
+    trap 'rm -f "$TMP"' EXIT
+
+    docker ps --format '{{.Names}}\t{{.Status}}\t{{.Image}}' > "$TMP"
+
+    if [ -n "$FILTER" ]; then
+      grep -E "$FILTER" "$TMP" > "${TMP}.filtered" || true
+      mv "${TMP}.filtered" "$TMP"
+    fi
+
+    TOTAL="$(grep -c . "$TMP" || true)"
+    UNHEALTHY="$(grep -ci 'unhealthy' "$TMP" || true)"
+    RESTARTING="$(grep -ci 'restarting' "$TMP" || true)"
+
+    echo "Docker Service Health"
+    echo "====================="
+    if [ -n "$FILTER" ]; then
+      echo "Filter: $FILTER"
+    fi
+    echo "Running containers: $TOTAL"
+    echo "Unhealthy containers: $UNHEALTHY"
+    echo "Restarting containers: $RESTARTING"
+    echo ""
+
+    if [ "$TOTAL" -eq 0 ]; then
+      echo "No running containers matched the current filter."
+      exit 0
+    fi
+
+    echo "First containers:"
+    awk -F '\t' -v limit="$LIMIT" 'NR <= limit { printf("- %s (%s)\n", $1, $2) }' "$TMP"
+
+  mode: sync
+  timeout: 30
+
+output:
+  type: text
+
+requirements:
+  - docker

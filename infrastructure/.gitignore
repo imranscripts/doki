@@ -1,0 +1,7 @@
+# Ignore actual config files (only examples should be committed)
+targets.yaml
+environments.yaml
+secrets.yaml
+
+# Ignore backup history
+.history/
