@@ -10,7 +10,7 @@ Apps without custom extensions run directly in the main container. Apps with cus
 
 ## Key Concepts
 
-### 1. Main Container (`php-command-executor`)
+### 1. Main Container (`doki-main-app`)
 - **Image**: `php:8.1-apache`
 - **Purpose**: Web server, app manager, reverse proxy
 - **Access**: Full read-write to all files
@@ -48,7 +48,7 @@ Apps without custom extensions run directly in the main container. Apps with cus
                        │ HTTP
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Main Container: php-command-executor                        │
+│  Main Container: doki-main-app                               │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
 │  │   Apache     │  │  PHP 8.1     │  │  Bootstrap   │      │
 │  │   :80        │  │  (Base)      │  │  Router      │      │
@@ -199,7 +199,7 @@ docker logs doki-fpm-{appId}
 
 ### Test FastCGI Connection
 ```bash
-docker exec php-command-executor telnet {fpm-ip} 9000
+docker exec doki-main-app telnet {fpm-ip} 9000
 ```
 
 ## Related Documentation

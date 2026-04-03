@@ -24,22 +24,28 @@ foreach ($args as $arg) {
 
 $showHelp = in_array('--help', $filteredArgs, true) || in_array('-h', $filteredArgs, true);
 $verbose = in_array('--verbose', $filteredArgs, true) || in_array('-v', $filteredArgs, true);
+$skipCore = in_array('--skip-core', $filteredArgs, true);
 
 if ($showHelp || $mode === null) {
-    fwrite(STDOUT, "Usage: php app/scripts/runtime-control.php <start|stop> [--verbose]\n");
+    fwrite(STDOUT, "Usage: php app/scripts/runtime-control.php <start|stop> [--verbose] [--skip-core]\n");
     fwrite(STDOUT, "  start        Start the Doki stack and known app containers\n");
     fwrite(STDOUT, "  stop         Stop the Doki stack and related app/job containers\n");
     fwrite(STDOUT, "  --verbose    Show per-action details\n");
+    fwrite(STDOUT, "  --skip-core  Only manage app runtimes/services, not docker compose\n");
     exit($showHelp ? 0 : 1);
 }
 
-$projectRoot = dirname(__DIR__, 2);
+$appRoot = dirname(__DIR__);
+$projectRoot = dirname($appRoot);
+if (!is_file($projectRoot . '/docker-compose.yml')) {
+    $projectRoot = $appRoot;
+}
 if (!@chdir($projectRoot)) {
     fwrite(STDERR, "Unable to switch to project root: {$projectRoot}\n");
     exit(1);
 }
 
-$runtimeLogDir = $projectRoot . '/app/data/app-build-status';
+$runtimeLogDir = $appRoot . '/data/app-build-status';
 if (!is_dir($runtimeLogDir)) {
     @mkdir($runtimeLogDir, 0755, true);
 }
@@ -81,10 +87,14 @@ $runCommand = static function (array $command, int $timeoutSeconds = 60, ?string
     $deadline = microtime(true) + max(1, $timeoutSeconds);
     $output = '';
     $timedOut = false;
+    $resolvedExitCode = null;
 
     while (true) {
         $status = proc_get_status($process);
         $running = !empty($status['running']);
+        if (!$running && isset($status['exitcode']) && $status['exitcode'] >= 0) {
+            $resolvedExitCode = (int)$status['exitcode'];
+        }
         $remaining = $deadline - microtime(true);
 
         $read = [];
@@ -137,6 +147,9 @@ $runCommand = static function (array $command, int $timeoutSeconds = 60, ?string
     }
 
     $exitCode = proc_close($process);
+    if ($exitCode === -1 && $resolvedExitCode !== null) {
+        $exitCode = $resolvedExitCode;
+    }
     $output = trim($output);
 
     if ($timedOut) {
@@ -154,9 +167,14 @@ $runCommand = static function (array $command, int $timeoutSeconds = 60, ?string
     ];
 };
 
-$commandExists = static function (string $command) use ($runCommand): bool {
-    $result = $runCommand(['sh', '-lc', 'command -v ' . escapeshellarg($command)], 5);
-    return $result['success'];
+$commandExists = static function (string $command): bool {
+    $command = trim($command);
+    if ($command === '') {
+        return false;
+    }
+
+    $probe = @shell_exec('/bin/sh -lc ' . escapeshellarg('command -v ' . escapeshellarg($command) . ' 2>/dev/null'));
+    return is_string($probe) && trim($probe) !== '';
 };
 
 $probeHttp = static function (string $url): bool {
@@ -274,11 +292,16 @@ if ($mode === 'start') {
     $printLine('Doki start');
     $printLine('==========');
 
-    $composeUp = $runCommand(['docker', 'compose', 'up', '-d'], 240, $projectRoot);
-    if (!$composeUp['success']) {
-        $issues[] = 'Core stack failed to start: ' . trim((string)$composeUp['output']);
+    $composeUp = ['success' => true, 'output' => '', 'exitCode' => 0];
+    if (!$skipCore) {
+        $composeUp = $runCommand(['docker', 'compose', 'up', '-d'], 240, $projectRoot);
+        if (!$composeUp['success']) {
+            $issues[] = 'Core stack failed to start: ' . trim((string)$composeUp['output']);
+        } else {
+            $startOutcome['core'][] = 'Docker Compose stack is running';
+        }
     } else {
-        $startOutcome['core'][] = 'Docker Compose stack is running';
+        $startOutcome['core'][] = 'Core stack already running';
     }
 
     if ($issues === []) {
@@ -408,13 +431,16 @@ $printLine('=========');
 
 $runningRelatedContainers = [];
 foreach (
-    [
-        ['label=doki.job.id'],
-        ['label=doki.app'],
-        ['name=^php-command-executor$'],
-        ['name=^doki-main-app$'],
-        ['name=^doki-go-orchestrator$'],
-    ] as $filters
+    array_merge(
+        [
+            ['label=doki.job.id'],
+            ['label=doki.app'],
+        ],
+        $skipCore ? [] : [
+            ['name=^doki-main-app$'],
+            ['name=^doki-go-orchestrator$'],
+        ]
+    ) as $filters
 ) {
     foreach ($listRunningContainers($filters) as $id => $name) {
         $runningRelatedContainers[$id] = $name;
@@ -430,16 +456,21 @@ foreach ($runningRelatedContainers as $id => $name) {
     }
 }
 
-$composeStop = $runCommand(['docker', 'compose', 'stop'], 120, $projectRoot);
-if ($composeStop['success']) {
-    $stopOutcome['core'][] = 'Docker Compose stack stopped';
-} else {
-    $message = trim((string)$composeStop['output']);
-    if ($message !== '') {
-        $stopOutcome['failed'][] = 'Core stack: ' . $message;
+$composeStop = ['success' => true, 'output' => '', 'exitCode' => 0];
+if (!$skipCore) {
+    $composeStop = $runCommand(['docker', 'compose', 'stop'], 120, $projectRoot);
+    if ($composeStop['success']) {
+        $stopOutcome['core'][] = 'Docker Compose stack stopped';
     } else {
-        $stopOutcome['failed'][] = 'Core stack: docker compose stop failed';
+        $message = trim((string)$composeStop['output']);
+        if ($message !== '') {
+            $stopOutcome['failed'][] = 'Core stack: ' . $message;
+        } else {
+            $stopOutcome['failed'][] = 'Core stack: docker compose stop failed';
+        }
     }
+} else {
+    $stopOutcome['core'][] = 'Core stack stop skipped';
 }
 
 if ($verbose && $composeStop['output'] !== '') {

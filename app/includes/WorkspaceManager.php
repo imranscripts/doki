@@ -417,7 +417,7 @@ class WorkspaceManager {
         }
 
         $previewRoot = $this->previewRoot($workspaceId);
-        $this->deleteDirectory($previewRoot);
+        $this->resetPreviewRoot($previewRoot);
         $this->copyDirectory($appDir, $previewRoot);
 
         $requestedPage = $this->normalizePreviewPage($page);
@@ -504,6 +504,8 @@ class WorkspaceManager {
             return ['success' => false, 'error' => 'Workspace not found'];
         }
 
+        $workspace = $this->ensureWorkspaceStorageWritable($workspace);
+
         $resolved = $this->resolveWorkspaceFilePath($workspace['repoPath'], $filePath, true);
         if ($resolved === null) {
             return ['success' => false, 'error' => 'Invalid file path'];
@@ -513,6 +515,8 @@ class WorkspaceManager {
         if (file_put_contents($resolved, $content) === false) {
             return ['success' => false, 'error' => 'Failed to write file'];
         }
+
+        $this->setFileWritable($resolved);
 
         $this->touchWorkspace($workspaceId, $userId);
         $this->refreshPreviewIfPresent($workspaceId);
@@ -528,6 +532,8 @@ class WorkspaceManager {
             return ['success' => false, 'error' => 'Workspace not found'];
         }
 
+        $workspace = $this->ensureWorkspaceStorageWritable($workspace);
+
         $resolved = $this->resolveWorkspaceFilePath($workspace['repoPath'], $filePath, true);
         if ($resolved === null) {
             return ['success' => false, 'error' => 'Invalid file path'];
@@ -540,6 +546,8 @@ class WorkspaceManager {
         if (file_put_contents($resolved, $content) === false) {
             return ['success' => false, 'error' => 'Failed to create file'];
         }
+
+        $this->setFileWritable($resolved);
 
         $this->touchWorkspace($workspaceId, $userId);
         $this->refreshPreviewIfPresent($workspaceId);
@@ -554,6 +562,8 @@ class WorkspaceManager {
         if ($workspace === null) {
             return ['success' => false, 'error' => 'Workspace not found'];
         }
+
+        $workspace = $this->ensureWorkspaceStorageWritable($workspace);
 
         $resolved = $this->resolveWorkspaceFilePath($workspace['repoPath'], $filePath, false);
         if ($resolved === null || !file_exists($resolved)) {
@@ -579,6 +589,9 @@ class WorkspaceManager {
         if ($workspace === null) {
             return ['success' => false, 'error' => 'Workspace not found'];
         }
+
+        $workspace = $this->ensureWorkspaceStorageWritable($workspace);
+
         if ($operations === []) {
             return ['success' => false, 'error' => 'No file operations were provided'];
         }
@@ -620,6 +633,8 @@ class WorkspaceManager {
                 if (file_put_contents($operation['resolvedPath'], $content) === false) {
                     return ['success' => false, 'error' => 'Failed to write file: ' . $operation['path']];
                 }
+
+                $this->setFileWritable($operation['resolvedPath']);
             } elseif (file_exists($operation['resolvedPath'])) {
                 if (is_dir($operation['resolvedPath'])) {
                     $this->deleteDirectory($operation['resolvedPath']);
@@ -1868,9 +1883,40 @@ YAML;
      * Ensure a directory exists.
      */
     private function ensureDirectory(string $path): void {
-        if (!is_dir($path) && !mkdir($path, 0755, true) && !is_dir($path)) {
+        if (!is_dir($path) && !mkdir($path, 0777, true) && !is_dir($path)) {
             throw new RuntimeException('Failed to create directory: ' . $path);
         }
+
+        $this->setDirectoryWritable($path);
+    }
+
+    private function ensureWorkspaceStorageWritable(array $workspace): array {
+        $repoPath = (string)($workspace['repoPath'] ?? '');
+        if ($repoPath !== '' && is_dir($repoPath) && is_writable($repoPath)) {
+            return $workspace;
+        }
+
+        $workspaceId = (string)($workspace['id'] ?? '');
+        if ($workspaceId === '') {
+            return $workspace;
+        }
+
+        $currentRoot = (string)($workspace['workspace_root'] ?? $this->workspaceRoot($workspaceId));
+        $migratedRoot = self::WORKSPACES_DIR . '/' . $workspaceId . '--runtime';
+
+        if (!is_dir($migratedRoot)) {
+            $this->copyDirectory($currentRoot, $migratedRoot);
+        }
+
+        $this->db->prepare("UPDATE app_workspaces SET workspace_root = ?, updated_at = datetime('now') WHERE id = ?")
+            ->execute([$migratedRoot, $workspaceId]);
+
+        $updatedWorkspace = $this->getWorkspace($workspaceId);
+        if ($updatedWorkspace === null) {
+            throw new RuntimeException('Failed to update workspace storage path');
+        }
+
+        return $updatedWorkspace;
     }
 
     /**
@@ -1880,6 +1926,36 @@ YAML;
         $this->ensureDirectory(dirname($path));
         if (file_put_contents($path, $content) === false) {
             throw new RuntimeException('Failed to write file: ' . $path);
+        }
+
+        $this->setFileWritable($path);
+    }
+
+    private function setDirectoryWritable(string $path): void {
+        if (is_dir($path)) {
+            @chmod($path, 0777);
+        }
+    }
+
+    private function setFileWritable(string $path): void {
+        if (is_file($path)) {
+            @chmod($path, 0666);
+        }
+    }
+
+    private function resetPreviewRoot(string $path): void {
+        if (!file_exists($path)) {
+            return;
+        }
+
+        $this->deleteDirectory($path);
+        if (!file_exists($path)) {
+            return;
+        }
+
+        $stalePath = dirname($path) . '/.stale-' . basename($path) . '-' . date('YmdHis');
+        if (!@rename($path, $stalePath)) {
+            throw new RuntimeException('Failed to reset preview directory: ' . $path);
         }
     }
 
@@ -1942,6 +2018,8 @@ YAML;
             if (!copy($sourcePath, $destinationPath)) {
                 throw new RuntimeException('Failed to copy file: ' . $sourcePath);
             }
+
+            $this->setFileWritable($destinationPath);
         }
     }
 

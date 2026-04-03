@@ -27,7 +27,6 @@ class OnboardingManager {
     private const RUNTIME_DIRS = [
         'config' => __DIR__ . '/../data/config',
         'keys' => __DIR__ . '/../data/keys',
-        'sessions' => __DIR__ . '/../data/sessions',
         'sources' => __DIR__ . '/../data/sources',
         'installed-apps' => __DIR__ . '/../data/installed-apps',
         'playwright-runtime' => __DIR__ . '/../data/playwright-runtime',

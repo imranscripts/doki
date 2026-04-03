@@ -26,6 +26,7 @@ capabilities:
 runtime:
   phpExtensions:
     - zip  # For Download All feature (native ZipArchive)
+    - imagick # For image processing
 
 # Uses ImageMagick container for image processing (on-demand)
 requiredImages:

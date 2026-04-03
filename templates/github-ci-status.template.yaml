@@ -48,9 +48,9 @@ inputs:
     description: Exit with an error if the latest run is not successful
     options:
       - value: "false"
-        label: No
+        label: "No"
       - value: "true"
-        label: Yes
+        label: "Yes"
 
 execution:
   script: |

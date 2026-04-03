@@ -31,7 +31,7 @@ RUN sed -i 's/listen = 127.0.0.1:9000/listen = 0.0.0.0:9000/' /usr/local/etc/php
 RUN echo "upload_max_filesize = 100M" > /usr/local/etc/php/conf.d/uploads.ini && \
     echo "post_max_size = 100M" >> /usr/local/etc/php/conf.d/uploads.ini && \
     echo "memory_limit = 256M" >> /usr/local/etc/php/conf.d/uploads.ini && \
-    echo "session.save_path = /var/www/html/data/sessions" >> /usr/local/etc/php/conf.d/uploads.ini
+    echo "session.save_path = /var/www/sessions" >> /usr/local/etc/php/conf.d/uploads.ini
 
 # Mark this as an FPM container (prevents proxy loop)
 ENV DOKI_FPM_CONTAINER=true

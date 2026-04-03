@@ -38,8 +38,8 @@ RUN apt-get install -y \
 # Enable Apache modules (if needed)
 RUN a2enmod rewrite
 
-# Configure shared session storage (for FPM containers to share sessions)
-RUN echo "session.save_path = /var/www/html/app/data/sessions" > /usr/local/etc/php/conf.d/sessions.ini
+# Configure shared session storage outside the bind-mounted source tree
+RUN echo "session.save_path = /var/www/sessions" > /usr/local/etc/php/conf.d/sessions.ini
 
 # Allow larger uploads (keeps base PHP in sync with app FPM containers)
 RUN echo "upload_max_filesize = 100M" > /usr/local/etc/php/conf.d/uploads.ini && \
@@ -69,7 +69,7 @@ RUN echo '#!/bin/bash' > /docker-entrypoint.sh && \
     echo '# Allow www-data to access Docker socket' >> /docker-entrypoint.sh && \
     echo 'chmod 666 /var/run/docker.sock 2>/dev/null || true' >> /docker-entrypoint.sh && \
     echo '# Create shared sessions directory' >> /docker-entrypoint.sh && \
-    echo 'mkdir -p /var/www/html/app/data/sessions && chmod 1733 /var/www/html/app/data/sessions' >> /docker-entrypoint.sh && \
+    echo 'mkdir -p /var/www/sessions && chmod 1733 /var/www/sessions' >> /docker-entrypoint.sh && \
     echo 'exec apache2-foreground' >> /docker-entrypoint.sh && \
     chmod +x /docker-entrypoint.sh
 

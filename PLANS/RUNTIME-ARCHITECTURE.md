@@ -9,7 +9,7 @@ Doki uses a **dual-container architecture** to support apps with custom PHP exte
 ### 1. Main Doki Container (Apache + PHP)
 
 **Image**: `php:8.1-apache`  
-**Container Name**: `php-command-executor`  
+**Container Name**: `doki-main-app`  
 **Port**: 8099 (mapped to host)
 
 **Responsibilities**:
