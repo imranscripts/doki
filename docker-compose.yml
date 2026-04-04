@@ -15,6 +15,7 @@ services:
       - DOKI_ORCH_TOKEN=${DOKI_ORCH_TOKEN:-dev-insecure}
     volumes:
       - ./app:/var/www/html:rw,z
+      - doki-sessions:/var/www/sessions
       - ./templates:/var/www/templates:ro  # Templates are read-only
       - ./infrastructure:/var/www/infrastructure:ro  # Infrastructure examples
       - ./docker:/var/www/docker:ro  # Docker build files for runner images
@@ -37,6 +38,7 @@ services:
       - HOST_APP_PATH=${PWD}/app
     volumes:
       - ./app:/var/www/html:rw,z
+      - doki-sessions:/var/www/sessions
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "${DOKI_ORCH_HOST_PORT:-8098}:8098"
@@ -44,3 +46,6 @@ services:
       - php-app
     restart: unless-stopped
     privileged: true
+
+volumes:
+  doki-sessions:

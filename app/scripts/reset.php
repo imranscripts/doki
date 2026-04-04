@@ -53,7 +53,6 @@ $directoriesToSweep = array_map(
         '/app/data/installed-apps',
         '/app/data/keys',
         '/app/data/playwright-runtime',
-        '/app/data/sessions',
         '/app/data/sources',
         '/app/data/users',
         '/app/data/workspaces',
@@ -92,7 +91,6 @@ $directoriesToEnsure = [
     $projectRoot . '/app/data/installed-apps',
     $projectRoot . '/app/data/keys',
     $projectRoot . '/app/data/playwright-runtime',
-    $projectRoot . '/app/data/sessions',
     $projectRoot . '/app/data/sources',
     $projectRoot . '/app/data/templates',
     $projectRoot . '/app/data/users',
@@ -129,7 +127,6 @@ foreach ($directoriesToEnsure as $directory) {
 
 if (!$dryRun) {
     @chmod($projectRoot . '/app/data/keys', 0700);
-    @chmod($projectRoot . '/app/data/sessions', 01777);
 }
 
 fwrite(STDOUT, $dryRun ? "Doki reset preview\n" : "Doki reset\n");

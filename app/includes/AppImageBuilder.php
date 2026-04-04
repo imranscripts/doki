@@ -128,7 +128,7 @@ class AppImageBuilder {
      * Run a Docker command with a consistent local daemon configuration.
      */
     private function runDockerCommand(string $cmd, int $timeoutSeconds = 2): array {
-        $dockerConfigDir = __DIR__ . '/../data/docker-config';
+        $dockerConfigDir = '/tmp/doki-docker-config';
         if (!is_dir($dockerConfigDir)) {
             @mkdir($dockerConfigDir, 0755, true);
         }
@@ -187,6 +187,30 @@ class AppImageBuilder {
         }
         $keys = array_keys($networks);
         return $keys[0] ?? null;
+    }
+
+    private function getContainerNetworks(string $containerName, int $timeoutSeconds = 3): array {
+        $cmd = "docker inspect {$containerName} --format '{{json .NetworkSettings.Networks}}' 2>&1";
+        $result = $this->runDockerCommand($cmd, $timeoutSeconds);
+        $json = trim($result['output'] ?? '');
+        if ($json === '' || $this->looksLikeDockerError($json)) {
+            return [];
+        }
+
+        $networks = json_decode($json, true);
+        if (!is_array($networks) || empty($networks)) {
+            return [];
+        }
+
+        return array_keys($networks);
+    }
+
+    private function containerHasExpectedNetwork(string $containerName, string $expectedNetwork, int $timeoutSeconds = 3): bool {
+        if ($expectedNetwork === '') {
+            return false;
+        }
+
+        return in_array($expectedNetwork, $this->getContainerNetworks($containerName, $timeoutSeconds), true);
     }
 
     private function extractNetworkName(string $output): ?string {
@@ -264,12 +288,48 @@ class AppImageBuilder {
         return $output;
     }
 
-    private function containerHasExpectedMounts(string $hostAppPath): bool {
+    private function inspectContainerMountName(string $containerName, string $destination): ?string {
+        $inspectCmd = sprintf(
+            "docker inspect %s --format '{{range .Mounts}}{{if eq .Destination \"%s\"}}{{.Name}}{{end}}{{end}}' 2>&1",
+            escapeshellarg($containerName),
+            addslashes($destination)
+        );
+        $result = $this->runDockerCommand($inspectCmd, 5);
+        $output = trim((string)($result['output'] ?? ''));
+        if ($output === '' || $this->looksLikeDockerError($output)) {
+            return null;
+        }
+        return $output;
+    }
+
+    private function resolveSharedSessionsVolumeName(): string {
+        $candidateContainers = array_values(array_unique(array_filter([
+            trim((string)(getenv('HOSTNAME') ?: '')),
+            'doki-main-app',
+            'php-app',
+        ])));
+
+        foreach ($candidateContainers as $candidateContainer) {
+            $volumeName = $this->inspectContainerMountName($candidateContainer, '/var/www/sessions');
+            if ($volumeName !== null && $volumeName !== '') {
+                return $volumeName;
+            }
+        }
+
+        return 'doki_doki-sessions';
+    }
+
+    private function containerHasExpectedMounts(string $hostAppPath, ?string $expectedSessionMountSource = null): bool {
         $containerName = $this->getContainerName();
         $appSource = $this->inspectContainerMountSource($containerName, '/var/www/html');
         $dataSource = $this->inspectContainerMountSource($containerName, '/var/www/html/data');
+        $sessionSource = $this->inspectContainerMountSource($containerName, '/var/www/sessions');
 
         if ($appSource === null || $dataSource === null) {
+            return false;
+        }
+
+        if ($expectedSessionMountSource !== null && $expectedSessionMountSource !== '' && $sessionSource !== $expectedSessionMountSource) {
             return false;
         }
 
@@ -531,7 +591,7 @@ class AppImageBuilder {
         $imageName = $this->getImageName();
         
         // Set Docker config to writable location
-        $dockerConfigDir = __DIR__ . '/../data/docker-config';
+        $dockerConfigDir = '/tmp/doki-docker-config';
         if (!is_dir($dockerConfigDir)) {
             mkdir($dockerConfigDir, 0755, true);
         }
@@ -596,6 +656,8 @@ class AppImageBuilder {
         $containerName = $this->getContainerName();
         $imageName = $this->getImageName();
         $hostAppPath = $this->resolveHostAppPath();
+        $sessionsVolumeName = $this->resolveSharedSessionsVolumeName();
+        $expectedSessionMountSource = '/var/lib/docker/volumes/' . $sessionsVolumeName . '/_data';
 
         $inspectCmd = "docker image inspect {$imageName} 2>&1";
         $inspectResult = $this->runDockerCommand($inspectCmd, 6);
@@ -616,9 +678,13 @@ class AppImageBuilder {
             }
         }
         
+        $dokiNetwork = $this->getDokiNetwork(5);
+
         // Check if already running
         if ($this->isContainerRunning(3)) {
-            if ($hostAppPath !== '/var/www/html' && $this->containerHasExpectedMounts($hostAppPath)) {
+            $hasExpectedMounts = $hostAppPath === '/var/www/html'
+                || $this->containerHasExpectedMounts($hostAppPath, $expectedSessionMountSource);
+            if ($hasExpectedMounts && $this->containerHasExpectedNetwork($containerName, $dokiNetwork, 3)) {
                 return [
                     'success' => true,
                     'message' => 'Container already running',
@@ -626,7 +692,7 @@ class AppImageBuilder {
                 ];
             }
 
-            error_log("AppImageBuilder[{$this->appId}]: Running container has invalid mounts, recreating");
+            error_log("AppImageBuilder[{$this->appId}]: Running container has stale mounts or network, recreating");
             $this->removeContainer();
         }
         
@@ -664,9 +730,6 @@ class AppImageBuilder {
         if ($shouldCreate) {
             // Create new container
             // Mount the app directory and Doki's data
-            // Find the network the main Doki container is on
-            $dokiNetwork = $this->getDokiNetwork(5);
-            
             // Mount:
             // - /var/www/html:ro for code (read-only)
             // - /var/www/html/data:rw for database, sessions, app data (read-write overlay)
@@ -679,6 +742,7 @@ class AppImageBuilder {
                 '-e HOST_APP_PATH=%s ' .
                 '-v %s:/var/www/html:ro ' .
                 '-v %s/data:/var/www/html/data:rw ' .
+                '-v %s:/var/www/sessions ' .
                 '-v /var/run/docker.sock:/var/run/docker.sock ' .
                 '--network %s ' .
                 '%s 2>&1',
@@ -687,6 +751,7 @@ class AppImageBuilder {
                 escapeshellarg($hostAppPath),
                 escapeshellarg($hostAppPath),
                 escapeshellarg($hostAppPath),
+                escapeshellarg($sessionsVolumeName),
                 escapeshellarg($dokiNetwork),
                 escapeshellarg($imageName)
             );
@@ -697,8 +762,8 @@ class AppImageBuilder {
             error_log("AppImageBuilder[{$this->appId}]: Create result: {$runOutput}");
             
             if (!$runResult['success'] && $this->isNetworkNotFoundError($runOutput)) {
-                // Retry with resolved network from running container (network IDs can go stale)
-                $fallbackNetwork = $this->resolveNetworkFromContainer('php-command-executor', 3) ?: 'doki_default';
+                // Retry with a fresh network lookup from the active app container.
+                $fallbackNetwork = $this->getDokiNetwork(3);
                 $runCmdRetry = str_replace('--network ' . $dokiNetwork, '--network ' . $fallbackNetwork, $runCmd);
                 $retryResult = $this->runDockerCommand($runCmdRetry, 12);
                 $retryOutput = trim($retryResult['output'] ?? '');
@@ -777,23 +842,20 @@ class AppImageBuilder {
      * Get the Docker network that the main Doki container is on
      */
     private function getDokiNetwork(int $timeoutSeconds = 2): string {
-        // Prefer actual network name from the running php-command-executor container.
-        $resolved = $this->resolveNetworkFromContainer('php-command-executor', $timeoutSeconds);
-        if (!empty($resolved)) {
-            error_log("AppImageBuilder: Resolved Doki network from container: {$resolved}");
-            return $resolved;
+        $candidateContainers = array_values(array_unique(array_filter([
+            trim((string)(getenv('HOSTNAME') ?: '')),
+            'doki-main-app',
+            'php-app',
+        ])));
+
+        foreach ($candidateContainers as $candidateContainer) {
+            $resolved = $this->resolveNetworkFromContainer($candidateContainer, $timeoutSeconds);
+            if (!empty($resolved)) {
+                error_log("AppImageBuilder: Resolved Doki network from container {$candidateContainer}: {$resolved}");
+                return $resolved;
+            }
         }
 
-        // Try to get network from the main Doki container (php-command-executor)
-        $networkCmd = "docker inspect php-command-executor --format '{{range \$k, \$v := .NetworkSettings.Networks}}{{\$k}}{{end}}' 2>&1";
-        $networkResult = $this->runDockerCommand($networkCmd, $timeoutSeconds);
-        $network = $this->extractNetworkName($networkResult['output'] ?? '');
-        
-        if (!empty($network)) {
-            error_log("AppImageBuilder: Found Doki network: {$network}");
-            return $network;
-        }
-        
         // Fallback: try to find by label
         $labelCmd = "docker ps --filter 'label=com.docker.compose.service=php-app' --format '{{.ID}}' 2>&1";
         $labelResult = $this->runDockerCommand($labelCmd, $timeoutSeconds);

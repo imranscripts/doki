@@ -6,7 +6,7 @@
 graph TB
     subgraph "Host Machine"
         subgraph "Docker Network (doki_default)"
-            subgraph "Main Container: php-command-executor"
+            subgraph "Main Container: doki-main-app"
                 Apache[Apache Web Server<br/>Port 80 → 8099]
                 PHP[PHP 8.1<br/>Base Extensions]
                 Bootstrap[app-bootstrap.php<br/>Request Router]
@@ -367,7 +367,7 @@ sequenceDiagram
 graph TB
     subgraph "Host Machine"
         subgraph "Docker Network: doki_default"
-            subgraph "Main Container: php-command-executor"
+            subgraph "Main Container: doki-main-app"
                 Apache[Apache Web Server<br/>Port 80 → 8099]
                 PHP[PHP 8.1<br/>Base Extensions]
                 Bootstrap[app-bootstrap.php<br/>Request Router]

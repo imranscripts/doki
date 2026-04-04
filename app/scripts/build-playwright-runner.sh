@@ -41,17 +41,23 @@ fi
 
 # Try to resolve host path for Docker build context
 HOST_APP_PATH=""
-if command -v jq &> /dev/null; then
-    DETECTED_PATH=$(docker inspect php-command-executor 2>/dev/null | jq -r '.[0].Mounts[] | select(.Destination == "/var/www/html") | .Source' 2>/dev/null)
-fi
+DETECTED_PATH=""
+for CANDIDATE in "${HOSTNAME:-}" "doki-main-app" "php-app"; do
+    [ -z "$CANDIDATE" ] && continue
 
-if [ -z "$DETECTED_PATH" ] || [ "$DETECTED_PATH" = "null" ]; then
-    DETECTED_PATH=$(docker inspect php-command-executor --format '{{range .Mounts}}{{if eq .Destination "/var/www/html"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
-fi
+    if command -v jq &> /dev/null; then
+        DETECTED_PATH=$(docker inspect "$CANDIDATE" 2>/dev/null | jq -r '.[0].Mounts[] | select(.Destination == "/var/www/html") | .Source' 2>/dev/null)
+    fi
 
-if [ -n "$DETECTED_PATH" ] && [ "$DETECTED_PATH" != "/var/www/html" ] && [ "$DETECTED_PATH" != "null" ]; then
-    HOST_APP_PATH="$DETECTED_PATH"
-fi
+    if [ -z "$DETECTED_PATH" ] || [ "$DETECTED_PATH" = "null" ]; then
+        DETECTED_PATH=$(docker inspect "$CANDIDATE" --format '{{range .Mounts}}{{if eq .Destination "/var/www/html"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
+    fi
+
+    if [ -n "$DETECTED_PATH" ] && [ "$DETECTED_PATH" != "/var/www/html" ] && [ "$DETECTED_PATH" != "null" ]; then
+        HOST_APP_PATH="$DETECTED_PATH"
+        break
+    fi
+done
 
 if [ -n "$HOST_APP_PATH" ]; then
     HOST_DOCKERFILE_DIR=$(echo "$HOST_APP_PATH" | sed 's|/app$|/docker/playwright|')

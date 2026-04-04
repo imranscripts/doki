@@ -5,7 +5,17 @@
 
 if (!function_exists('doki_get_session_save_path')) {
     function doki_get_session_save_path(): string {
-        return __DIR__ . '/../data/sessions';
+        $volumePath = '/var/www/sessions';
+        if (is_dir($volumePath) || (!file_exists($volumePath) && @mkdir($volumePath, 01777, true))) {
+            return $volumePath;
+        }
+
+        $sharedPath = realpath(__DIR__ . '/../data');
+        if (is_string($sharedPath) && $sharedPath !== '') {
+            return $sharedPath . '/sessions';
+        }
+
+        return '/var/www/html/data/sessions';
     }
 }
 
@@ -20,7 +30,17 @@ if (!function_exists('doki_prepare_session_storage')) {
         }
 
         $resolved = realpath($path);
-        return is_string($resolved) && $resolved !== '' ? $resolved : $path;
+        $candidate = is_string($resolved) && $resolved !== '' ? $resolved : $path;
+        if (@is_dir($candidate) && @is_writable($candidate)) {
+            return $candidate;
+        }
+
+        if (!is_dir('/tmp')) {
+            @mkdir('/tmp', 01777, true);
+        }
+        @chmod('/tmp', 01777);
+
+        return '/tmp';
     }
 }
 

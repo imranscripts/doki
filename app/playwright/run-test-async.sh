@@ -45,19 +45,27 @@ LEGACY_RESULT_FILE="${APP_DIR}/playwright-jobs/${JOB_ID}.result"
 # Host path for Docker volume mounts (Docker sees host paths, not container paths)
 # Auto-detect from Docker mount info if not set via environment
 if [ -z "$HOST_APP_PATH" ]; then
-    # Method 1: Use docker inspect with jq (if available)
-    if command -v jq &> /dev/null; then
-        DETECTED_PATH=$(docker inspect php-command-executor 2>/dev/null | jq -r '.[0].Mounts[] | select(.Destination == "/var/www/html") | .Source' 2>/dev/null)
-    fi
-    
-    # Method 2: Parse JSON manually if jq not available
-    if [ -z "$DETECTED_PATH" ] || [ "$DETECTED_PATH" = "null" ]; then
-        DETECTED_PATH=$(docker inspect php-command-executor --format '{{range .Mounts}}{{if eq .Destination "/var/www/html"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
-    fi
-    
-    if [ -n "$DETECTED_PATH" ] && [ "$DETECTED_PATH" != "/var/www/html" ] && [ "$DETECTED_PATH" != "null" ]; then
-        HOST_APP_PATH="$DETECTED_PATH"
-    else
+    DETECTED_PATH=""
+    for CANDIDATE in "${HOSTNAME:-}" "doki-main-app" "php-app"; do
+        [ -z "$CANDIDATE" ] && continue
+
+        # Method 1: Use docker inspect with jq (if available)
+        if command -v jq &> /dev/null; then
+            DETECTED_PATH=$(docker inspect "$CANDIDATE" 2>/dev/null | jq -r '.[0].Mounts[] | select(.Destination == "/var/www/html") | .Source' 2>/dev/null)
+        fi
+
+        # Method 2: Parse JSON manually if jq not available
+        if [ -z "$DETECTED_PATH" ] || [ "$DETECTED_PATH" = "null" ]; then
+            DETECTED_PATH=$(docker inspect "$CANDIDATE" --format '{{range .Mounts}}{{if eq .Destination "/var/www/html"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
+        fi
+
+        if [ -n "$DETECTED_PATH" ] && [ "$DETECTED_PATH" != "/var/www/html" ] && [ "$DETECTED_PATH" != "null" ]; then
+            HOST_APP_PATH="$DETECTED_PATH"
+            break
+        fi
+    done
+
+    if [ -z "$HOST_APP_PATH" ]; then
         # Fallback: use container path (will only work if Docker runs on same host without nested containers)
         HOST_APP_PATH="$APP_DIR"
     fi
