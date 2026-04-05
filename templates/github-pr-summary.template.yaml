@@ -12,6 +12,16 @@ description: Fetch a GitHub pull request summary with title, author, labels, cha
 icon: fab fa-github
 color: "#111827"
 
+capabilityHints:
+  capabilities:
+    - pr.inspect
+    - repo.analyze
+    - text.format
+  payloadHandling:
+    - scalar-only
+    - small-text
+  scriptRuntime: python
+
 runtime:
   image: python:3.12-alpine
   network: host

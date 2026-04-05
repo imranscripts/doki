@@ -12,6 +12,14 @@ description: Check a live API endpoint for expected status, latency, text, and r
 icon: fas fa-vial-circle-check
 color: "#0F766E"
 
+capabilityHints:
+  capabilities:
+    - api.validate
+  payloadHandling:
+    - scalar-only
+    - small-text
+  scriptRuntime: python
+
 runtime:
   image: python:3.12-alpine
   network: host

@@ -14,6 +14,17 @@ targetType: http    # Maps to 'http' target in environment
 icon: fas fa-plug
 color: "#FF9800"
 
+capabilityHints:
+  capabilities:
+    - http.fetch
+  payloadHandling:
+    - scalar-only
+    - small-text
+  scriptRuntime: sh
+  dataFlow:
+    requestPathInput: path
+    requestHeadersInput: headers
+
 # ----------------------------------------------------------------------------
 # RUNTIME
 # ----------------------------------------------------------------------------
@@ -59,6 +70,12 @@ inputs:
     required: false
     placeholder: '{"key": "value"}'
     description: Request body (for POST/PUT/PATCH)
+
+  - name: headers
+    label: Extra Headers
+    type: string
+    required: false
+    description: "Additional headers (format: Header1:Value1,Header2:Value2)"
 
   - name: timeout
     label: Timeout (seconds)
@@ -127,6 +144,19 @@ execution:
     elif [ "$HTTP_AUTH_TYPE" = "basic" ] && [ -n "$HTTP_AUTH_USERNAME" ]; then
       set -- "$@" -u "$HTTP_AUTH_USERNAME:$HTTP_AUTH_PASSWORD"
     fi
+
+    {{#if headers}}
+    _HEADERS_RAW="{{headers}}"
+    _OLD_IFS="$IFS"
+    IFS=','
+    set -f
+    for _H in $_HEADERS_RAW; do
+      _H=$(echo "$_H" | sed 's/^ *//;s/ *$//')
+      [ -n "$_H" ] && set -- "$@" -H "$_H"
+    done
+    set +f
+    IFS="$_OLD_IFS"
+    {{/if}}
 
     {{#if followRedirects}}
     set -- "$@" -L

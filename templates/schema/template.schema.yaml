@@ -23,6 +23,19 @@ icon: string  # e.g., "fab fa-docker"
 # Optional: Accent color for UI
 color: string  # e.g., "#2196F3"
 
+# Optional: Capability hints for AI, validation, and future registry logic
+capabilityHints:
+  capabilities: [string]  # e.g., ["http.fetch", "json.extract"]
+  payloadHandling: [string]  # e.g., ["scalar-only", "small-text", "structured-json"]
+  scriptRuntime: string  # e.g., "sh", "python", "node"
+  dataFlow:
+    scriptInput: string  # e.g., "command" or "script"
+    payloadInputs: [string]  # e.g., ["payload1", "payload2"]
+    requestPathInput: string  # e.g., "path"
+    requestHeadersInput: string  # e.g., "headers"
+    payloadValueMode: string  # e.g., "parsed-json-or-raw"
+    payloadRawSuffix: string  # e.g., "_raw"
+
 # ============================================================================
 # RUNTIME CONFIGURATION
 # ============================================================================

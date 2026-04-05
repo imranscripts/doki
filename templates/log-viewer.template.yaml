@@ -13,6 +13,15 @@ description: View and tail log files
 icon: fas fa-file-alt
 color: "#FF5722"
 
+capabilityHints:
+  capabilities:
+    - logs.view
+    - logs.stream
+  payloadHandling:
+    - scalar-only
+    - small-text
+  scriptRuntime: sh
+
 # ============================================================================
 # RUNTIME - Container this template runs in
 # ============================================================================

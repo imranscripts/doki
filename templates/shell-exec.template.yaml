@@ -13,6 +13,17 @@ description: Execute shell commands
 icon: fas fa-terminal
 color: "#424242"
 
+capabilityHints:
+  capabilities:
+    - shell.glue
+    - text.format
+  payloadHandling:
+    - scalar-only
+    - small-text
+  scriptRuntime: sh
+  dataFlow:
+    scriptInput: command
+
 # ============================================================================
 # RUNTIME - Container this template runs in
 # ============================================================================

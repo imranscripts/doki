@@ -10,6 +10,9 @@ class TemplateManager {
     private const TEMPLATES_DIR_DOCKER = '/var/www/templates';
     private const TEMPLATES_DIR_LOCAL = __DIR__ . '/../../templates';
     private const CUSTOM_TEMPLATES_DIR = __DIR__ . '/../data/templates';
+    private ?array $templatesCache = null;
+    private ?array $templateIndexCache = null;
+    private ?array $capabilityRegistryCache = null;
     
     private function getTemplatesDir(): string {
         // Check Docker path first
@@ -28,11 +31,15 @@ class TemplateManager {
      * Get all available templates
      */
     public function getTemplates(): array {
+        if ($this->templatesCache !== null) {
+            return $this->templatesCache;
+        }
+
         $templatesById = [];
         $roots = $this->getTemplateRoots();
 
         if ($roots === []) {
-            return ['success' => false, 'error' => 'Templates directory not found: ' . $this->getTemplatesDir(), 'templates' => []];
+            return $this->templatesCache = ['success' => false, 'error' => 'Templates directory not found: ' . $this->getTemplatesDir(), 'templates' => []];
         }
 
         foreach ($roots as $root) {
@@ -48,23 +55,151 @@ class TemplateManager {
         $templates = array_values($templatesById);
         usort($templates, fn($a, $b) => strcasecmp($a['name'], $b['name']));
 
-        return ['success' => true, 'templates' => $templates];
+        return $this->templatesCache = ['success' => true, 'templates' => $templates];
     }
     
     /**
      * Get a single template by ID
      */
     public function getTemplate(string $id): ?array {
+        $index = $this->getTemplateIndex();
+        return $index[$id] ?? null;
+    }
+
+    public function getCapabilityRegistry(): array {
+        if ($this->capabilityRegistryCache !== null) {
+            return $this->capabilityRegistryCache;
+        }
+
         $result = $this->getTemplates();
-        if (!$result['success']) return null;
-        
+        if (!$result['success']) {
+            return $this->capabilityRegistryCache = [
+                'success' => false,
+                'error' => $result['error'] ?? 'Unable to load templates',
+                'registry' => [],
+            ];
+        }
+
+        $registry = [
+            'templates' => [],
+            'capabilities' => [],
+            'payloadHandling' => [],
+            'scriptRuntimes' => [],
+        ];
+
         foreach ($result['templates'] as $template) {
-            if ($template['id'] === $id) {
-                return $template;
+            $summary = $this->buildCapabilityTemplateSummary($template);
+            $registry['templates'][] = $summary;
+
+            foreach ($summary['capabilities'] as $capability) {
+                $this->addTemplateSummaryToRegistryBucket($registry['capabilities'], $capability, $summary);
+            }
+            foreach ($summary['payloadHandling'] as $payloadHandling) {
+                $this->addTemplateSummaryToRegistryBucket($registry['payloadHandling'], $payloadHandling, $summary);
+            }
+            if ($summary['scriptRuntime'] !== null) {
+                $this->addTemplateSummaryToRegistryBucket($registry['scriptRuntimes'], $summary['scriptRuntime'], $summary);
             }
         }
-        
-        return null;
+
+        usort($registry['templates'], fn($a, $b) => strcasecmp($a['name'], $b['name']));
+        foreach (['capabilities', 'payloadHandling', 'scriptRuntimes'] as $bucket) {
+            $registry[$bucket] = $this->normalizeRegistryBucket($registry[$bucket]);
+        }
+
+        return $this->capabilityRegistryCache = ['success' => true, 'registry' => $registry];
+    }
+
+    public function getTemplatesByCapability(string $capability): array {
+        return $this->filterTemplatesByCapabilityField('capabilities', $capability);
+    }
+
+    public function getTemplatesByPayloadHandling(string $payloadHandling): array {
+        return $this->filterTemplatesByCapabilityField('payloadHandling', $payloadHandling);
+    }
+
+    public function getBestTemplateCandidatesForCapability(string $capability, array $context = []): array {
+        $capability = trim($capability);
+        if ($capability === '') {
+            return [];
+        }
+
+        $candidates = [];
+        $payloadHandling = $this->normalizeStringList($context['payloadHandling'] ?? []);
+        $scriptRuntime = isset($context['scriptRuntime']) && is_string($context['scriptRuntime'])
+            ? trim($context['scriptRuntime'])
+            : '';
+        $requiresScriptInput = !empty($context['requiresScriptInput']);
+        $requiresPayloadInputs = !empty($context['requiresPayloadInputs']);
+
+        foreach ($this->getTemplatesByCapability($capability) as $template) {
+            $hints = $template['capabilityHints'] ?? $this->normalizeCapabilityHints([]);
+            $score = 100;
+            $reasons = ["supports {$capability}"];
+            $warnings = [];
+
+            foreach ($payloadHandling as $payloadKind) {
+                if (in_array($payloadKind, $hints['payloadHandling'], true)) {
+                    $score += 15;
+                    $reasons[] = "handles {$payloadKind}";
+                }
+            }
+
+            if ($scriptRuntime !== '') {
+                if ($hints['scriptRuntime'] === $scriptRuntime) {
+                    $score += 10;
+                    $reasons[] = "matches {$scriptRuntime} runtime";
+                } elseif ($hints['scriptRuntime'] !== null) {
+                    $warnings[] = "uses {$hints['scriptRuntime']} runtime";
+                }
+            }
+
+            $scriptInput = trim((string)($hints['dataFlow']['scriptInput'] ?? ''));
+            $payloadInputs = array_values(array_filter(
+                array_map('strval', (array)($hints['dataFlow']['payloadInputs'] ?? [])),
+                static fn(string $value): bool => trim($value) !== ''
+            ));
+
+            if ($requiresScriptInput) {
+                if ($scriptInput !== '') {
+                    $score += 12;
+                    $reasons[] = "accepts script input `{$scriptInput}`";
+                } else {
+                    $score -= 12;
+                    $warnings[] = 'does not declare a script input';
+                }
+            }
+
+            if ($requiresPayloadInputs) {
+                if ($payloadInputs !== []) {
+                    $score += 18;
+                    $reasons[] = 'accepts dedicated payload inputs';
+                } else {
+                    $score -= 18;
+                    $warnings[] = 'does not declare dedicated payload inputs';
+                }
+            }
+
+            $candidates[] = array_merge($template, [
+                'capabilityMatch' => [
+                    'capability' => $capability,
+                    'score' => $score,
+                    'reasons' => $reasons,
+                    'warnings' => $warnings,
+                ],
+            ]);
+        }
+
+        usort($candidates, function ($a, $b) {
+            $scoreCompare = ($b['capabilityMatch']['score'] ?? 0) <=> ($a['capabilityMatch']['score'] ?? 0);
+            if ($scoreCompare !== 0) {
+                return $scoreCompare;
+            }
+
+            return strcasecmp($a['name'], $b['name']);
+        });
+
+        return $candidates;
     }
 
     private function getTemplateRoots(): array {
@@ -80,6 +215,24 @@ class TemplateManager {
         }
 
         return $roots;
+    }
+
+    private function getTemplateIndex(): array {
+        if ($this->templateIndexCache !== null) {
+            return $this->templateIndexCache;
+        }
+
+        $result = $this->getTemplates();
+        if (!$result['success']) {
+            return $this->templateIndexCache = [];
+        }
+
+        $index = [];
+        foreach ($result['templates'] as $template) {
+            $index[$template['id']] = $template;
+        }
+
+        return $this->templateIndexCache = $index;
     }
     
     /**
@@ -179,6 +332,11 @@ class TemplateManager {
                 $data['execution'] = $execution;
             }
         }
+
+        $capabilityHints = $this->extractCapabilityHintsManual($content);
+        if ($capabilityHints !== []) {
+            $data['capabilityHints'] = $capabilityHints;
+        }
         
         if (empty($data['id'])) return null;
         
@@ -231,6 +389,236 @@ class TemplateManager {
         
         return $inputs;
     }
+
+    private function extractCapabilityHintsManual(string $content): array {
+        if (!preg_match('/^capabilityHints:\s*\n((?:\s{2,}.*(?:\n|$))*)/m', $content, $match)) {
+            return [];
+        }
+
+        $block = $match[1];
+        $capabilityHints = [];
+
+        foreach (['capabilities', 'payloadHandling'] as $field) {
+            $values = $this->extractYamlListFieldManual($block, $field);
+            if ($values !== []) {
+                $capabilityHints[$field] = $values;
+            }
+        }
+
+        if (preg_match('/^\s{2}scriptRuntime:\s*(.+)\s*$/m', $block, $runtimeMatch)) {
+            $scriptRuntime = trim($runtimeMatch[1], "\"' ");
+            if ($scriptRuntime !== '') {
+                $capabilityHints['scriptRuntime'] = $scriptRuntime;
+            }
+        }
+
+        $dataFlow = $this->extractCapabilityDataFlowManual($block);
+        if ($dataFlow !== []) {
+            $capabilityHints['dataFlow'] = $dataFlow;
+        }
+
+        return $capabilityHints;
+    }
+
+    private function extractCapabilityDataFlowManual(string $block): array {
+        if (!preg_match('/^\s{2}dataFlow:\s*\n((?:\s{4,}.*(?:\n|$))*)/m', $block, $match)) {
+            return [];
+        }
+
+        $dataFlowBlock = $match[1];
+        $dataFlow = [];
+
+        if (preg_match('/^\s{4}scriptInput:\s*(.+)\s*$/m', $dataFlowBlock, $scriptMatch)) {
+            $scriptInput = trim($scriptMatch[1], "\"' ");
+            if ($scriptInput !== '') {
+                $dataFlow['scriptInput'] = $scriptInput;
+            }
+        }
+
+        foreach (['requestPathInput', 'requestHeadersInput'] as $field) {
+            if (preg_match('/^\s{4}' . preg_quote($field, '/') . ':\s*(.+)\s*$/m', $dataFlowBlock, $fieldMatch)) {
+                $value = trim($fieldMatch[1], "\"' ");
+                if ($value !== '') {
+                    $dataFlow[$field] = $value;
+                }
+            }
+        }
+
+        foreach (['payloadValueMode', 'payloadRawSuffix'] as $field) {
+            if (preg_match('/^\s{4}' . preg_quote($field, '/') . ':\s*(.+)\s*$/m', $dataFlowBlock, $fieldMatch)) {
+                $value = trim($fieldMatch[1], "\"' ");
+                if ($value !== '') {
+                    $dataFlow[$field] = $value;
+                }
+            }
+        }
+
+        $payloadInputs = $this->extractYamlListFieldManual($dataFlowBlock, 'payloadInputs');
+        if ($payloadInputs !== []) {
+            $dataFlow['payloadInputs'] = $payloadInputs;
+        }
+
+        return $dataFlow;
+    }
+
+    private function extractYamlListFieldManual(string $block, string $fieldName): array {
+        $pattern = '/^\s{2}' . preg_quote($fieldName, '/') . ':\s*\n((?:\s{4}-\s*.+(?:\n|$))*)/m';
+        if (!preg_match($pattern, $block, $match)) {
+            return [];
+        }
+
+        $values = [];
+        preg_match_all('/^\s{4}-\s*(.+)\s*$/m', $match[1], $valueMatches);
+        foreach ($valueMatches[1] as $value) {
+            $trimmed = trim($value, "\"' ");
+            if ($trimmed !== '' && !in_array($trimmed, $values, true)) {
+                $values[] = $trimmed;
+            }
+        }
+
+        return $values;
+    }
+
+    private function normalizeCapabilityHints($capabilityHints): array {
+        $normalized = [
+            'capabilities' => [],
+            'payloadHandling' => [],
+            'scriptRuntime' => null,
+            'dataFlow' => [
+                'scriptInput' => null,
+                'payloadInputs' => [],
+                'requestPathInput' => null,
+                'requestHeadersInput' => null,
+                'payloadValueMode' => null,
+                'payloadRawSuffix' => null,
+            ],
+        ];
+
+        if (!is_array($capabilityHints)) {
+            return $normalized;
+        }
+
+        foreach (['capabilities', 'payloadHandling'] as $field) {
+            $normalized[$field] = $this->normalizeStringList($capabilityHints[$field] ?? []);
+        }
+
+        if (isset($capabilityHints['scriptRuntime']) && is_string($capabilityHints['scriptRuntime'])) {
+            $scriptRuntime = trim($capabilityHints['scriptRuntime']);
+            if ($scriptRuntime !== '') {
+                $normalized['scriptRuntime'] = $scriptRuntime;
+            }
+        }
+
+        if (is_array($capabilityHints['dataFlow'] ?? null)) {
+            $dataFlow = $capabilityHints['dataFlow'];
+            if (isset($dataFlow['scriptInput']) && is_string($dataFlow['scriptInput'])) {
+                $scriptInput = trim($dataFlow['scriptInput']);
+                if ($scriptInput !== '') {
+                    $normalized['dataFlow']['scriptInput'] = $scriptInput;
+                }
+            }
+            $normalized['dataFlow']['payloadInputs'] = $this->normalizeStringList($dataFlow['payloadInputs'] ?? []);
+            foreach (['requestPathInput', 'requestHeadersInput', 'payloadValueMode', 'payloadRawSuffix'] as $field) {
+                if (isset($dataFlow[$field]) && is_string($dataFlow[$field])) {
+                    $value = trim($dataFlow[$field]);
+                    if ($value !== '') {
+                        $normalized['dataFlow'][$field] = $value;
+                    }
+                }
+            }
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeStringList($value): array {
+        if (is_string($value)) {
+            $value = [$value];
+        }
+
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($value as $item) {
+            if (!is_string($item)) {
+                continue;
+            }
+
+            $trimmed = trim($item);
+            if ($trimmed !== '' && !in_array($trimmed, $normalized, true)) {
+                $normalized[] = $trimmed;
+            }
+        }
+
+        return $normalized;
+    }
+
+    private function buildCapabilityTemplateSummary(array $template): array {
+        $hints = $template['capabilityHints'] ?? $this->normalizeCapabilityHints([]);
+
+        return [
+            'id' => $template['id'],
+            'name' => $template['name'],
+            'category' => $template['category'] ?? 'core',
+            'source' => $template['source'] ?? 'builtin',
+            'targetType' => $template['targetType'] ?? null,
+            'capabilities' => $hints['capabilities'],
+            'payloadHandling' => $hints['payloadHandling'],
+            'scriptRuntime' => $hints['scriptRuntime'],
+            'dataFlow' => $hints['dataFlow'],
+        ];
+    }
+
+    private function addTemplateSummaryToRegistryBucket(array &$bucket, string $key, array $summary): void {
+        $key = trim($key);
+        if ($key === '') {
+            return;
+        }
+
+        if (!isset($bucket[$key])) {
+            $bucket[$key] = [
+                'name' => $key,
+                'count' => 0,
+                'templates' => [],
+            ];
+        }
+
+        $bucket[$key]['templates'][$summary['id']] = $summary;
+        $bucket[$key]['count'] = count($bucket[$key]['templates']);
+    }
+
+    private function normalizeRegistryBucket(array $bucket): array {
+        ksort($bucket);
+
+        foreach ($bucket as &$entry) {
+            $templates = array_values($entry['templates']);
+            usort($templates, fn($a, $b) => strcasecmp($a['name'], $b['name']));
+            $entry['templates'] = $templates;
+            $entry['count'] = count($templates);
+        }
+        unset($entry);
+
+        return $bucket;
+    }
+
+    private function filterTemplatesByCapabilityField(string $field, string $value): array {
+        $value = trim($value);
+        if ($value === '') {
+            return [];
+        }
+
+        $result = $this->getTemplates();
+        if (!$result['success']) {
+            return [];
+        }
+
+        return array_values(array_filter($result['templates'], function (array $template) use ($field, $value) {
+            $hints = $template['capabilityHints'] ?? $this->normalizeCapabilityHints([]);
+            return in_array($value, $hints[$field] ?? [], true);
+        }));
+    }
     
     /**
      * Normalize and enhance template data
@@ -269,6 +657,7 @@ class TemplateManager {
             'output' => $data['output'] ?? ['type' => 'text'],
             'requirements' => $data['requirements'] ?? [],
             'targetBindings' => $data['targetBindings'] ?? [],
+            'capabilityHints' => $this->normalizeCapabilityHints($data['capabilityHints'] ?? []),
             'source' => $source,
         ];
     }

@@ -14,6 +14,15 @@ targetType: elasticsearch    # Maps to 'elasticsearch' target in environment
 icon: fas fa-search
 color: "#00BCD4"
 
+capabilityHints:
+  capabilities:
+    - search.query
+    - service.health
+  payloadHandling:
+    - scalar-only
+    - small-text
+  scriptRuntime: sh
+
 # ============================================================================
 # RUNTIME - Container this template runs in
 # ============================================================================

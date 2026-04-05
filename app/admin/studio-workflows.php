@@ -668,6 +668,9 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             display: flex;
             flex-direction: column;
             gap: 10px;
+            max-height: min(52vh, 560px);
+            overflow: auto;
+            padding-right: 4px;
         }
 
         .studio-step-item {
@@ -1694,6 +1697,740 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             font-size: 11px;
         }
 
+        .studio-ai-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .studio-ai-actions .studio-btn {
+            min-height: 36px;
+        }
+
+        .studio-ai-plan-box {
+            display: none;
+            border-top: 1px solid var(--border-primary);
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.28);
+        }
+
+        .studio-ai-plan-box.visible {
+            display: block;
+        }
+
+        .studio-ai-plan-title {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .studio-ai-plan-summary {
+            margin: 0 0 10px 0;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .studio-ai-plan-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .studio-ai-plan-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 10px;
+            border: 1px solid var(--border-primary);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.03);
+            font-size: 12px;
+        }
+
+        .studio-ai-plan-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 7px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            background: rgba(37, 99, 235, 0.14);
+            color: #60a5fa;
+            flex-shrink: 0;
+        }
+
+        .studio-ai-plan-path {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text-primary);
+        }
+
+        .studio-ai-plan-notes {
+            margin: 10px 0 0 0;
+            padding-left: 16px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .studio-ai-plan-notes li + li {
+            margin-top: 4px;
+        }
+
+        .studio-ai-plan-lint {
+            margin-top: 12px;
+            padding: 12px;
+            border: 1px solid rgba(245, 158, 11, 0.34);
+            border-radius: 12px;
+            background: rgba(245, 158, 11, 0.08);
+        }
+
+        .studio-ai-plan-lint.danger {
+            border-color: rgba(239, 68, 68, 0.36);
+            background: rgba(239, 68, 68, 0.08);
+        }
+
+        .studio-ai-plan-lint-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0 0 10px 0;
+            font-size: 12px;
+            font-weight: 700;
+            color: #fbbf24;
+        }
+
+        .studio-ai-plan-lint.danger .studio-ai-plan-lint-title {
+            color: #fca5a5;
+        }
+
+        .studio-ai-plan-lint-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .studio-ai-plan-lint-item {
+            padding: 10px;
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.16);
+            border: 1px solid rgba(245, 158, 11, 0.18);
+        }
+
+        .studio-ai-plan-lint-item.danger {
+            border-color: rgba(239, 68, 68, 0.3);
+            background: rgba(127, 29, 29, 0.16);
+        }
+
+        .studio-ai-plan-lint-item-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .studio-ai-plan-lint-item-meta {
+            margin-top: 4px;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        }
+
+        .studio-ai-plan-lint-item-message {
+            margin-top: 6px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+        }
+
+        .studio-ai-plan-actions {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .studio-ai-flag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            background: rgba(88, 166, 255, 0.12);
+            color: var(--accent-primary);
+        }
+
+        .studio-ai-flag.reverted {
+            background: rgba(255, 184, 108, 0.12);
+            color: #ffb86c;
+        }
+
+        .modal.studio-diff-modal {
+            width: min(96vw, 1680px);
+        }
+
+        .studio-diff-layout {
+            display: grid;
+            grid-template-columns: 260px minmax(0, 1fr);
+            gap: 16px;
+            min-height: 520px;
+        }
+
+        .studio-diff-files {
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            background: var(--bg-primary);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            overflow: auto;
+        }
+
+        .studio-diff-file {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .studio-diff-file:hover {
+            background: rgba(255,255,255,0.03);
+            border-color: var(--border-primary);
+        }
+
+        .studio-diff-file.active {
+            background: rgba(37, 99, 235, 0.1);
+            border-color: rgba(37, 99, 235, 0.35);
+        }
+
+        .studio-diff-file-path {
+            font-size: 12px;
+            font-weight: 600;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .studio-diff-file-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+
+        .studio-diff-view {
+            border: 1px solid var(--border-primary);
+            border-radius: 14px;
+            background: #0b1120;
+            overflow: hidden;
+            min-width: 0;
+            min-height: 520px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .studio-diff-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            border-bottom: 1px solid #1e293b;
+            background: rgba(15, 23, 42, 0.94);
+        }
+
+        .studio-diff-meta-main {
+            min-width: 0;
+        }
+
+        .studio-diff-meta-path {
+            font-size: 13px;
+            font-weight: 700;
+            color: #e2e8f0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .studio-diff-meta-copy {
+            margin-top: 4px;
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        .studio-diff-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .studio-diff-meta-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 9px;
+            border-radius: 999px;
+            background: rgba(37, 99, 235, 0.18);
+            color: #93c5fd;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            flex-shrink: 0;
+        }
+
+        .studio-diff-mode-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px;
+            border: 1px solid #334155;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.72);
+        }
+
+        .studio-diff-mode-btn {
+            border: 0;
+            border-radius: 999px;
+            background: transparent;
+            color: #94a3b8;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .studio-diff-mode-btn.active {
+            background: rgba(37, 99, 235, 0.22);
+            color: #dbeafe;
+        }
+
+        .studio-diff-content {
+            flex: 1;
+            min-height: 0;
+            overflow: auto;
+            font: 12px/1.6 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            color: #e2e8f0;
+        }
+
+        .studio-diff-content-inner {
+            min-width: 0;
+            width: 100%;
+        }
+
+        .studio-diff-empty {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        .studio-diff-grid {
+            --studio-diff-left-ratio: 0.5;
+            min-width: 0;
+            width: 100%;
+        }
+
+        .studio-diff-header,
+        .studio-diff-row {
+            display: grid;
+            grid-template-columns:
+                minmax(0, calc((100% - 12px) * var(--studio-diff-left-ratio)))
+                12px
+                minmax(0, calc((100% - 12px) * (1 - var(--studio-diff-left-ratio))));
+        }
+
+        .studio-diff-header {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: rgba(15, 23, 42, 0.98);
+            border-bottom: 1px solid #1e293b;
+        }
+
+        .studio-diff-header-cell {
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #94a3b8;
+        }
+
+        .studio-diff-row:hover .studio-diff-cell {
+            background-color: rgba(255,255,255,0.035);
+        }
+
+        .studio-diff-divider-spacer {
+            position: relative;
+            min-width: 12px;
+            background: rgba(15, 23, 42, 0.96);
+            border-left: 1px solid #1e293b;
+            border-right: 1px solid #1e293b;
+        }
+
+        .studio-diff-divider-spacer::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 1px;
+            transform: translateX(-50%);
+            background: rgba(148, 163, 184, 0.26);
+        }
+
+        .studio-diff-cell {
+            display: grid;
+            grid-template-columns: 58px 22px minmax(0, 1fr);
+            min-width: 0;
+            border-bottom: 1px solid rgba(30, 41, 59, 0.72);
+        }
+
+        .studio-diff-cell.right {
+        }
+
+        .studio-diff-cell.empty {
+            background: rgba(15, 23, 42, 0.35);
+        }
+
+        .studio-diff-cell.context {
+            background: rgba(15, 23, 42, 0.22);
+        }
+
+        .studio-diff-cell.delete {
+            background: rgba(239, 68, 68, 0.14);
+        }
+
+        .studio-diff-cell.add {
+            background: rgba(34, 197, 94, 0.14);
+        }
+
+        .studio-diff-cell-num,
+        .studio-diff-cell-mark {
+            user-select: none;
+            color: #64748b;
+        }
+
+        .studio-diff-cell-num,
+        .studio-diff-cell-mark,
+        .studio-diff-cell-text {
+            padding: 0 10px;
+            white-space: pre-wrap;
+        }
+
+        .studio-diff-cell-text {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: clip;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .studio-diff-cell.delete .studio-diff-cell-num,
+        .studio-diff-cell.delete .studio-diff-cell-mark {
+            color: #fca5a5;
+        }
+
+        .studio-diff-cell.add .studio-diff-cell-num,
+        .studio-diff-cell.add .studio-diff-cell-mark {
+            color: #86efac;
+        }
+
+        .studio-diff-gap {
+            display: grid;
+            grid-template-columns:
+                minmax(0, calc((100% - 12px) * var(--studio-diff-left-ratio)))
+                12px
+                minmax(0, calc((100% - 12px) * (1 - var(--studio-diff-left-ratio))));
+            color: #64748b;
+            background: rgba(15, 23, 42, 0.42);
+            border-top: 1px dashed rgba(100, 116, 139, 0.32);
+            border-bottom: 1px dashed rgba(100, 116, 139, 0.32);
+            font-style: italic;
+        }
+
+        .studio-diff-gap-cell {
+            padding: 4px 12px;
+        }
+
+        .studio-diff-gap-divider {
+            position: relative;
+            border-left: 1px solid #1e293b;
+            border-right: 1px solid #1e293b;
+        }
+
+        .studio-diff-gap-cell.right {
+        }
+
+        .studio-smart-diff {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .studio-smart-diff-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .studio-smart-diff-summary-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.16);
+            color: #cbd5e1;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .studio-smart-diff-summary-badge.added {
+            background: rgba(34, 197, 94, 0.18);
+            color: #bbf7d0;
+        }
+
+        .studio-smart-diff-summary-badge.removed {
+            background: rgba(239, 68, 68, 0.18);
+            color: #fecaca;
+        }
+
+        .studio-smart-diff-summary-badge.changed,
+        .studio-smart-diff-summary-badge.moved {
+            background: rgba(59, 130, 246, 0.18);
+            color: #bfdbfe;
+        }
+
+        .studio-smart-diff-section {
+            border: 1px solid #1e293b;
+            border-radius: 14px;
+            background: rgba(15, 23, 42, 0.48);
+            overflow: hidden;
+        }
+
+        .studio-smart-diff-section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            border-bottom: 1px solid #1e293b;
+            background: rgba(15, 23, 42, 0.82);
+        }
+
+        .studio-smart-diff-section-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+
+        .studio-smart-diff-section-count {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        .studio-smart-diff-items {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .studio-smart-diff-item {
+            padding: 14px;
+            border-top: 1px solid rgba(30, 41, 59, 0.72);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .studio-smart-diff-item:first-child {
+            border-top: 0;
+        }
+
+        .studio-smart-diff-item-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .studio-smart-diff-item-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .studio-smart-diff-item-badge.added {
+            background: rgba(34, 197, 94, 0.18);
+            color: #bbf7d0;
+        }
+
+        .studio-smart-diff-item-badge.removed {
+            background: rgba(239, 68, 68, 0.18);
+            color: #fecaca;
+        }
+
+        .studio-smart-diff-item-badge.changed {
+            background: rgba(59, 130, 246, 0.18);
+            color: #bfdbfe;
+        }
+
+        .studio-smart-diff-item-badge.moved {
+            background: rgba(168, 85, 247, 0.18);
+            color: #ddd6fe;
+        }
+
+        .studio-smart-diff-item-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #f8fafc;
+        }
+
+        .studio-smart-diff-item-copy {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .studio-smart-diff-item-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 12px;
+        }
+
+        .studio-smart-diff-panel {
+            min-width: 0;
+            border: 1px solid rgba(51, 65, 85, 0.92);
+            border-radius: 12px;
+            background: rgba(2, 6, 23, 0.62);
+            overflow: hidden;
+        }
+
+        .studio-smart-diff-panel-label {
+            padding: 8px 10px;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.92);
+            font-size: 11px;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .studio-smart-diff-code {
+            margin: 0;
+            padding: 10px 12px;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .studio-smart-diff-placeholder {
+            padding: 12px;
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.72);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            z-index: 1000;
+        }
+
+        .modal-backdrop.active {
+            display: flex;
+        }
+
+        .modal {
+            width: min(700px, 100%);
+            max-height: 90vh;
+            overflow-y: auto;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.32);
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-primary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .modal-close {
+            width: 34px;
+            height: 34px;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .modal-close:hover {
+            background: rgba(255,255,255,0.05);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-primary);
+        }
+
         .studio-ai-composer {
             display: flex;
             flex-direction: column;
@@ -1829,6 +2566,14 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
         @media (max-width: 940px) {
             .studio-stats {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .studio-diff-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .studio-diff-files {
+                max-height: 180px;
             }
 
             .studio-workbench {
@@ -2117,10 +2862,41 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                                         </div>
                                     </div>
                                     <div id="aiMessages" class="studio-ai-messages" aria-live="polite"></div>
+                                    <div class="studio-ai-plan-box" id="aiPlanBox">
+                                        <h3 class="studio-ai-plan-title">Pending Changes</h3>
+                                        <p class="studio-ai-plan-summary" id="aiPlanSummary">No proposed changes yet.</p>
+                                        <ul class="studio-ai-plan-list" id="aiPlanList"></ul>
+                                        <ul class="studio-ai-plan-notes" id="aiPlanNotes"></ul>
+                                        <div class="studio-ai-plan-lint" id="aiPlanLintBox" style="display:none;">
+                                            <div class="studio-ai-plan-lint-title">
+                                                <i class="fas fa-triangle-exclamation"></i>
+                                                <span>AI Review Warnings</span>
+                                            </div>
+                                            <ul class="studio-ai-plan-lint-list" id="aiPlanLintList"></ul>
+                                        </div>
+                                        <div class="studio-ai-plan-actions">
+                                            <button class="studio-btn secondary" type="button" id="aiViewDiffBtn">
+                                                <i class="fas fa-code-compare"></i>
+                                                View Diff
+                                            </button>
+                                            <button class="studio-btn secondary" type="button" id="aiSmartDiffBtn">
+                                                <i class="fas fa-diagram-project"></i>
+                                                Smart Diff
+                                            </button>
+                                            <button class="studio-btn primary" type="button" id="aiApplyBtn">
+                                                <i class="fas fa-check"></i>
+                                                Apply
+                                            </button>
+                                            <button class="studio-btn secondary" type="button" id="aiClearPlanBtn">
+                                                <i class="fas fa-xmark"></i>
+                                                Clear
+                                            </button>
+                                        </div>
+                                    </div>
                                     <form class="studio-ai-composer" id="aiChatForm">
                                         <textarea class="studio-textarea" id="aiPrompt" placeholder="Ask AI to create or edit this workflow. Example: replace the summary with a cleaner output or add one more step."></textarea>
                                         <div class="studio-ai-composer-row">
-                                            <span class="studio-helper">AI updates the current project in the editor. Review, save, and publish when ready.</span>
+                                            <span class="studio-helper">AI proposes workflow changes here. Review them before applying to the editor.</span>
                                             <div class="studio-ai-composer-actions">
                                                 <button class="studio-btn secondary" type="button" id="clearAiChatBtn">Clear</button>
                                                 <button class="studio-btn primary" type="submit" id="generateAiBtn" <?= $aiProviders === [] ? 'disabled' : '' ?>>
@@ -2164,6 +2940,40 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                         </div>
                     </button>
                 </div>
+
+                <div class="modal-backdrop" id="aiDiffModal">
+                    <div class="modal studio-diff-modal">
+                        <div class="modal-header">
+                            <h2><i class="fas fa-code-compare"></i> Proposed AI Changes</h2>
+                            <button class="modal-close" type="button" id="closeAiDiffModalBtn">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="studio-diff-layout">
+                                <div class="studio-diff-files" id="aiDiffFiles">
+                                    <div class="studio-diff-empty">No pending changes.</div>
+                                </div>
+                                <div class="studio-diff-view">
+                                    <div class="studio-diff-meta" id="aiDiffMeta">
+                                        <div class="studio-diff-meta-main">
+                                            <div class="studio-diff-meta-path">No file selected</div>
+                                            <div class="studio-diff-meta-copy">Select a changed file to inspect the proposed diff.</div>
+                                        </div>
+                                    </div>
+                                    <div class="studio-diff-content" id="aiDiffContent">
+                                        <div class="studio-diff-empty">No pending changes.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="studio-btn secondary" type="button" id="closeAiDiffFooterBtn">Close</button>
+                            <button class="studio-btn primary" type="button" id="aiDiffApplyBtn">Apply Changes</button>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </main>
     </div>
@@ -2178,11 +2988,16 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             isDirty: false,
             lastAiResult: null,
             aiMessages: [],
+            aiActionBusy: false,
+            pendingAiDraftMessageId: '',
+            aiDiffMessageId: '',
+            aiDiffMode: 'raw',
             lastDryRunResult: null,
             useInputs: {},
             activeJobId: null,
             activeJobIsDryRun: false,
             pollTimer: null,
+            pendingWorkflowResume: null,
             data: {
                 workflow: Array.isArray(initialStudioState.workflowProjects) ? initialStudioState.workflowProjects : [],
                 template: Array.isArray(initialStudioState.templateProjects) ? initialStudioState.templateProjects : [],
@@ -2199,8 +3014,10 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             environments: initialStudioState.environments && typeof initialStudioState.environments === 'object' ? initialStudioState.environments : {},
         };
 
-        const templateById = Object.fromEntries(studioState.runtimeTemplates.map((template) => [String(template.id || ''), template]).filter(([id]) => id));
+        let templateById = {};
         const targetById = Object.fromEntries(studioState.targets.map((target) => [String(target.id || ''), target]).filter(([id]) => id));
+
+        rebuildRuntimeTemplateLookup();
 
         const projectListEl = document.getElementById('projectList');
         const newProjectBtn = document.getElementById('newProjectBtn');
@@ -2244,9 +3061,26 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
         const aiProviderSelectEl = document.getElementById('aiProviderSelect');
         const aiChatFormEl = document.getElementById('aiChatForm');
         const aiMessagesEl = document.getElementById('aiMessages');
+        const aiPlanBoxEl = document.getElementById('aiPlanBox');
+        const aiPlanSummaryEl = document.getElementById('aiPlanSummary');
+        const aiPlanListEl = document.getElementById('aiPlanList');
+        const aiPlanNotesEl = document.getElementById('aiPlanNotes');
+        const aiPlanLintBoxEl = document.getElementById('aiPlanLintBox');
+        const aiPlanLintListEl = document.getElementById('aiPlanLintList');
+        const aiViewDiffBtn = document.getElementById('aiViewDiffBtn');
+        const aiSmartDiffBtn = document.getElementById('aiSmartDiffBtn');
+        const aiApplyBtn = document.getElementById('aiApplyBtn');
+        const aiClearPlanBtn = document.getElementById('aiClearPlanBtn');
         const aiPromptEl = document.getElementById('aiPrompt');
         const clearAiChatBtn = document.getElementById('clearAiChatBtn');
         const generateAiBtn = document.getElementById('generateAiBtn');
+        const aiDiffModalEl = document.getElementById('aiDiffModal');
+        const aiDiffFilesEl = document.getElementById('aiDiffFiles');
+        const aiDiffMetaEl = document.getElementById('aiDiffMeta');
+        const aiDiffContentEl = document.getElementById('aiDiffContent');
+        const closeAiDiffModalBtn = document.getElementById('closeAiDiffModalBtn');
+        const closeAiDiffFooterBtn = document.getElementById('closeAiDiffFooterBtn');
+        const aiDiffApplyBtn = document.getElementById('aiDiffApplyBtn');
 
         let workflowBuilderSteps = [];
         let workflowBuilderDefaultTarget = { mode: 'inherit', targetId: '', fromEnvironment: '', envId: '' };
@@ -2327,6 +3161,18 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             }
             closeWorkflowConnectorPopover();
         });
+        aiViewDiffBtn?.addEventListener('click', () => openAiDiffModal('raw'));
+        aiSmartDiffBtn?.addEventListener('click', () => openAiDiffModal('smart'));
+        aiApplyBtn?.addEventListener('click', applyAiPlan);
+        aiClearPlanBtn?.addEventListener('click', clearAiPendingChange);
+        closeAiDiffModalBtn?.addEventListener('click', closeAiDiffModal);
+        closeAiDiffFooterBtn?.addEventListener('click', closeAiDiffModal);
+        aiDiffApplyBtn?.addEventListener('click', applyAiPlan);
+        aiDiffModalEl?.addEventListener('click', (event) => {
+            if (event.target === aiDiffModalEl) {
+                closeAiDiffModal();
+            }
+        });
 
         function switchType(nextType) {
             studioState.type = nextType === 'template' ? 'template' : 'workflow';
@@ -2376,6 +3222,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             const previousProjectId = studioState.selectedProjectId;
             const record = project ? deepClone(project) : buildDefaultProject();
             const nextProjectId = project?.id || '';
+            closeAiDiffModal();
             if (previousProjectId !== nextProjectId) {
                 resetAiConversation(false);
             }
@@ -2642,7 +3489,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                     dependsOn: Array.isArray(step.dependsOn) ? step.dependsOn.map(String).filter(Boolean) : [],
                     onFailure: String(step.onFailure || 'stop') === 'continue' ? 'continue' : 'stop',
                     inputs: isPlainObject(step.inputs) ? { ...step.inputs } : {},
-                    secrets: Array.isArray(step.secrets) ? [...step.secrets] : (isPlainObject(step.secrets) ? { ...step.secrets } : []),
+                    secrets: isPlainObject(step.secrets) ? { ...step.secrets } : {},
                 }));
             return normalized.length ? normalized : [newWorkflowBuilderStep(0)];
         }
@@ -2656,7 +3503,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 dependsOn: previous?.id ? [previous.id] : [],
                 onFailure: 'stop',
                 inputs: {},
-                secrets: [],
+                secrets: {},
             };
         }
 
@@ -2689,7 +3536,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 dependsOn: Array.isArray(step.dependsOn) ? step.dependsOn.map(String).filter(Boolean) : [],
                 onFailure: String(step.onFailure || 'stop') === 'continue' ? 'continue' : 'stop',
                 inputs: isPlainObject(step.inputs) ? { ...step.inputs } : {},
-                secrets: Array.isArray(step.secrets) ? [...step.secrets] : (isPlainObject(step.secrets) ? { ...step.secrets } : []),
+                secrets: isPlainObject(step.secrets) ? { ...step.secrets } : {},
             }));
         }
 
@@ -2712,8 +3559,8 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             if (!Array.isArray(draft.inputContract)) {
                 draft.inputContract = [];
             }
-            if (!Array.isArray(draft.secrets)) {
-                draft.secrets = [];
+            if (!isPlainObject(draft.secrets)) {
+                draft.secrets = {};
             }
             if (!Array.isArray(draft.tags)) {
                 draft.tags = [];
@@ -3677,16 +4524,20 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
         function resetAiConversation(render = true) {
             studioState.aiMessages = [];
             studioState.lastAiResult = null;
+            studioState.pendingAiDraftMessageId = '';
+            studioState.aiDiffMessageId = '';
+            closeAiDiffModal();
             if (aiPromptEl) {
                 aiPromptEl.value = '';
             }
             if (render) {
                 renderAiMessages();
+                renderAiPlan();
             }
         }
 
         function appendAiMessage(role, content, meta = {}) {
-            studioState.aiMessages.push({
+            const message = {
                 id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                 role: role === 'assistant' ? 'assistant' : 'user',
                 content: String(content || '').trim(),
@@ -3695,13 +4546,812 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 providerName: meta.providerName ? String(meta.providerName) : '',
                 modelName: meta.modelName ? String(meta.modelName) : '',
                 applied: !!meta.applied,
+                reverted: !!meta.reverted,
                 validation: meta.validation || null,
+                validationBefore: meta.validationBefore || null,
                 versions: Array.isArray(meta.versions) ? meta.versions : [],
+                actions: Array.isArray(meta.actions) ? meta.actions : [],
+                draftBefore: meta.draftBefore && typeof meta.draftBefore === 'object' ? deepClone(meta.draftBefore) : null,
+                draftAfter: meta.draftAfter && typeof meta.draftAfter === 'object' ? deepClone(meta.draftAfter) : null,
+            };
+            studioState.aiMessages.push(message);
+            return message;
+        }
+
+        function getAiMessageById(messageId) {
+            return (Array.isArray(studioState.aiMessages) ? studioState.aiMessages : [])
+                .find((message) => String(message?.id || '') === String(messageId || '')) || null;
+        }
+
+        function getPendingAiDraftMessage() {
+            const message = getAiMessageById(studioState.pendingAiDraftMessageId || '');
+            if (!message || !message.draftAfter || typeof message.draftAfter !== 'object') {
+                return null;
+            }
+            return message;
+        }
+
+        function normalizeDraftForDiff(value) {
+            if (Array.isArray(value)) {
+                return value.map((item) => normalizeDraftForDiff(item));
+            }
+
+            if (value && typeof value === 'object') {
+                const normalized = {};
+                Object.keys(value)
+                    .sort((left, right) => left.localeCompare(right))
+                    .forEach((key) => {
+                        normalized[key] = normalizeDraftForDiff(value[key]);
+                    });
+                return normalized;
+            }
+
+            return value;
+        }
+
+        function serializeDraftForDiff(draft) {
+            return JSON.stringify(normalizeDraftForDiff(draft && typeof draft === 'object' ? draft : {}), null, 2);
+        }
+
+        function draftsEqual(left, right) {
+            return serializeDraftForDiff(left) === serializeDraftForDiff(right);
+        }
+
+        function createAiDiffSide(type, text, lineNumber) {
+            return {
+                type,
+                text: String(text || ''),
+                lineNumber: Number.isFinite(Number(lineNumber)) ? Number(lineNumber) : '',
+                marker: type === 'delete' ? '-' : (type === 'add' ? '+' : ' '),
+            };
+        }
+
+        function applyDraftToEditor(draft, validation = null) {
+            if (!draft || typeof draft !== 'object') {
+                throw new Error('No draft to apply');
+            }
+
+            projectNameEl.value = draft.name || projectNameEl.value;
+            runtimeIdEl.value = draft.id || runtimeIdEl.value;
+            projectDescriptionEl.value = draft.description || projectDescriptionEl.value;
+            draftJsonEl.value = JSON.stringify(draft || {}, null, 2);
+            draftJsonEl.dataset.lastSerialized = draftJsonEl.value;
+
+            if (studioState.type === 'workflow') {
+                loadWorkflowBuilderDraft(draft || {});
+                syncWorkflowDraftJsonFromBuilder(false);
+            }
+
+            studioState.currentValidation = validation && typeof validation === 'object'
+                ? deepClone(validation)
+                : null;
+            studioState.lastDryRunResult = null;
+            studioState.activeJobId = null;
+            studioState.activeJobIsDryRun = false;
+            clearJobPoll();
+            setStatusBadge('draft');
+            studioState.isDirty = true;
+            renderUsePanel();
+            renderDryRunResult(studioState.lastDryRunResult);
+        }
+
+        function buildAiDiffPairs(diff) {
+            const pairs = [];
+            let oldLine = 1;
+            let newLine = 1;
+            let index = 0;
+
+            while (index < diff.length) {
+                const entry = diff[index];
+                if (entry.type === 'context') {
+                    pairs.push({
+                        left: createAiDiffSide('context', entry.text, oldLine),
+                        right: createAiDiffSide('context', entry.text, newLine),
+                    });
+                    oldLine += 1;
+                    newLine += 1;
+                    index += 1;
+                    continue;
+                }
+
+                const leftRun = [];
+                const rightRun = [];
+                while (index < diff.length && diff[index].type !== 'context') {
+                    if (diff[index].type === 'delete') {
+                        leftRun.push(createAiDiffSide('delete', diff[index].text, oldLine));
+                        oldLine += 1;
+                    } else if (diff[index].type === 'add') {
+                        rightRun.push(createAiDiffSide('add', diff[index].text, newLine));
+                        newLine += 1;
+                    }
+                    index += 1;
+                }
+
+                const rowCount = Math.max(leftRun.length, rightRun.length);
+                for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+                    pairs.push({
+                        left: leftRun[rowIndex] || null,
+                        right: rightRun[rowIndex] || null,
+                    });
+                }
+            }
+
+            return pairs;
+        }
+
+        function renderAiDiffCell(side, position) {
+            if (!side) {
+                return `
+                    <div class="studio-diff-cell ${escapeHtml(position)} empty">
+                        <span class="studio-diff-cell-num"></span>
+                        <span class="studio-diff-cell-mark"></span>
+                        <span class="studio-diff-cell-text"></span>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="studio-diff-cell ${escapeHtml(position)} ${escapeHtml(side.type)}">
+                    <span class="studio-diff-cell-num">${escapeHtml(side.lineNumber)}</span>
+                    <span class="studio-diff-cell-mark">${escapeHtml(side.marker)}</span>
+                    <span class="studio-diff-cell-text">${escapeHtml(side.text)}</span>
+                </div>
+            `;
+        }
+
+        function buildAiDiffRows(diff) {
+            const pairs = buildAiDiffPairs(diff);
+            const changedIndexes = [];
+
+            pairs.forEach((pair, index) => {
+                if ((pair.left && pair.left.type !== 'context') || (pair.right && pair.right.type !== 'context')) {
+                    changedIndexes.push(index);
+                }
             });
+
+            if (!changedIndexes.length) {
+                return '';
+            }
+
+            const ranges = [];
+            const contextWindow = 2;
+            changedIndexes.forEach((index) => {
+                const start = Math.max(0, index - contextWindow);
+                const end = Math.min(pairs.length - 1, index + contextWindow);
+                const previous = ranges[ranges.length - 1];
+                if (!previous || start > previous.end + 1) {
+                    ranges.push({ start, end });
+                } else {
+                    previous.end = Math.max(previous.end, end);
+                }
+            });
+
+            const rows = [
+                '<div class="studio-diff-content-inner"><div class="studio-diff-grid">',
+                '<div class="studio-diff-header"><div class="studio-diff-header-cell">Current</div><div class="studio-diff-divider-spacer" aria-hidden="true"></div><div class="studio-diff-header-cell">Proposed</div></div>',
+            ];
+
+            ranges.forEach((range, rangeIndex) => {
+                if (rangeIndex > 0) {
+                    rows.push(`
+                        <div class="studio-diff-gap">
+                            <div class="studio-diff-gap-cell">...</div>
+                            <div class="studio-diff-gap-divider" aria-hidden="true"></div>
+                            <div class="studio-diff-gap-cell right">unchanged lines omitted</div>
+                        </div>
+                    `);
+                }
+
+                for (let index = range.start; index <= range.end; index += 1) {
+                    const pair = pairs[index];
+                    rows.push(`
+                        <div class="studio-diff-row">
+                            ${renderAiDiffCell(pair.left, 'left')}
+                            <div class="studio-diff-divider-spacer" aria-hidden="true"></div>
+                            ${renderAiDiffCell(pair.right, 'right')}
+                        </div>
+                    `);
+                }
+            });
+
+            rows.push('</div></div>');
+            return rows.join('');
+        }
+
+        function diffDraftLines(oldText, newText) {
+            const oldLines = String(oldText || '').replace(/\r\n/g, '\n').split('\n');
+            const newLines = String(newText || '').replace(/\r\n/g, '\n').split('\n');
+            if (oldLines.length && oldLines[oldLines.length - 1] === '') oldLines.pop();
+            if (newLines.length && newLines[newLines.length - 1] === '') newLines.pop();
+
+            if (oldLines.length === 0 && newLines.length === 0) {
+                return [];
+            }
+
+            return diffDraftLinesPatience(oldLines, newLines);
+        }
+
+        function diffDraftLinesPatience(oldLines, newLines) {
+            return diffDraftLinesPatienceRange(oldLines, 0, oldLines.length, newLines, 0, newLines.length);
+        }
+
+        function diffDraftLinesPatienceRange(oldLines, oldStart, oldEnd, newLines, newStart, newEnd) {
+            const diff = [];
+
+            while (oldStart < oldEnd && newStart < newEnd && oldLines[oldStart] === newLines[newStart]) {
+                diff.push({ type: 'context', text: oldLines[oldStart] });
+                oldStart += 1;
+                newStart += 1;
+            }
+
+            const suffix = [];
+            while (oldStart < oldEnd && newStart < newEnd && oldLines[oldEnd - 1] === newLines[newEnd - 1]) {
+                suffix.unshift({ type: 'context', text: oldLines[oldEnd - 1] });
+                oldEnd -= 1;
+                newEnd -= 1;
+            }
+
+            if (oldStart === oldEnd && newStart === newEnd) {
+                return diff.concat(suffix);
+            }
+
+            const anchors = findPatienceAnchors(oldLines, oldStart, oldEnd, newLines, newStart, newEnd);
+            if (!anchors.length) {
+                return diff
+                    .concat(diffDraftLinesLcs(oldLines.slice(oldStart, oldEnd), newLines.slice(newStart, newEnd)))
+                    .concat(suffix);
+            }
+
+            let oldCursor = oldStart;
+            let newCursor = newStart;
+            anchors.forEach((anchor) => {
+                diff.push(...diffDraftLinesPatienceRange(oldLines, oldCursor, anchor.oldIndex, newLines, newCursor, anchor.newIndex));
+                diff.push({ type: 'context', text: oldLines[anchor.oldIndex] });
+                oldCursor = anchor.oldIndex + 1;
+                newCursor = anchor.newIndex + 1;
+            });
+
+            diff.push(...diffDraftLinesPatienceRange(oldLines, oldCursor, oldEnd, newLines, newCursor, newEnd));
+            return diff.concat(suffix);
+        }
+
+        function findPatienceAnchors(oldLines, oldStart, oldEnd, newLines, newStart, newEnd) {
+            const oldCounts = new Map();
+            const newCounts = new Map();
+
+            for (let index = oldStart; index < oldEnd; index += 1) {
+                const line = oldLines[index];
+                const current = oldCounts.get(line);
+                if (current) {
+                    current.count += 1;
+                } else {
+                    oldCounts.set(line, { count: 1, index });
+                }
+            }
+
+            for (let index = newStart; index < newEnd; index += 1) {
+                const line = newLines[index];
+                const current = newCounts.get(line);
+                if (current) {
+                    current.count += 1;
+                } else {
+                    newCounts.set(line, { count: 1, index });
+                }
+            }
+
+            const candidates = [];
+            oldCounts.forEach((oldMeta, line) => {
+                const newMeta = newCounts.get(line);
+                if (oldMeta.count === 1 && newMeta && newMeta.count === 1) {
+                    candidates.push({ oldIndex: oldMeta.index, newIndex: newMeta.index });
+                }
+            });
+
+            candidates.sort((left, right) => left.oldIndex - right.oldIndex);
+            return longestIncreasingPairs(candidates);
+        }
+
+        function longestIncreasingPairs(pairs) {
+            if (!pairs.length) {
+                return [];
+            }
+
+            const predecessors = new Array(pairs.length).fill(-1);
+            const tails = [];
+
+            pairs.forEach((pair, index) => {
+                let low = 0;
+                let high = tails.length;
+                while (low < high) {
+                    const middle = Math.floor((low + high) / 2);
+                    if (pairs[tails[middle]].newIndex < pair.newIndex) {
+                        low = middle + 1;
+                    } else {
+                        high = middle;
+                    }
+                }
+
+                if (low > 0) {
+                    predecessors[index] = tails[low - 1];
+                }
+                tails[low] = index;
+            });
+
+            const sequence = [];
+            let cursor = tails[tails.length - 1];
+            while (cursor !== undefined && cursor !== -1) {
+                sequence.push(pairs[cursor]);
+                cursor = predecessors[cursor];
+            }
+
+            return sequence.reverse();
+        }
+
+        function diffDraftLinesLcs(oldLines, newLines) {
+            if (oldLines.length === 0 && newLines.length === 0) {
+                return [];
+            }
+
+            const maxCells = 250000;
+            if ((oldLines.length * newLines.length) > maxCells) {
+                return diffDraftLinesFallback(oldLines, newLines);
+            }
+
+            const rows = oldLines.length + 1;
+            const cols = newLines.length + 1;
+            const dp = Array.from({ length: rows }, () => new Uint32Array(cols));
+
+            for (let i = oldLines.length - 1; i >= 0; i -= 1) {
+                for (let j = newLines.length - 1; j >= 0; j -= 1) {
+                    dp[i][j] = oldLines[i] === newLines[j]
+                        ? dp[i + 1][j + 1] + 1
+                        : Math.max(dp[i + 1][j], dp[i][j + 1]);
+                }
+            }
+
+            const diff = [];
+            let i = 0;
+            let j = 0;
+            while (i < oldLines.length && j < newLines.length) {
+                if (oldLines[i] === newLines[j]) {
+                    diff.push({ type: 'context', text: oldLines[i] });
+                    i += 1;
+                    j += 1;
+                } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+                    diff.push({ type: 'delete', text: oldLines[i] });
+                    i += 1;
+                } else {
+                    diff.push({ type: 'add', text: newLines[j] });
+                    j += 1;
+                }
+            }
+
+            while (i < oldLines.length) {
+                diff.push({ type: 'delete', text: oldLines[i] });
+                i += 1;
+            }
+            while (j < newLines.length) {
+                diff.push({ type: 'add', text: newLines[j] });
+                j += 1;
+            }
+
+            return diff;
+        }
+
+        function diffDraftLinesFallback(oldLines, newLines) {
+            let prefix = 0;
+            while (
+                prefix < oldLines.length
+                && prefix < newLines.length
+                && oldLines[prefix] === newLines[prefix]
+            ) {
+                prefix += 1;
+            }
+
+            let oldSuffix = oldLines.length - 1;
+            let newSuffix = newLines.length - 1;
+            while (
+                oldSuffix >= prefix
+                && newSuffix >= prefix
+                && oldLines[oldSuffix] === newLines[newSuffix]
+            ) {
+                oldSuffix -= 1;
+                newSuffix -= 1;
+            }
+
+            const diff = [];
+            for (let index = 0; index < prefix; index += 1) {
+                diff.push({ type: 'context', text: oldLines[index] });
+            }
+            for (let index = prefix; index <= oldSuffix; index += 1) {
+                diff.push({ type: 'delete', text: oldLines[index] });
+            }
+            for (let index = prefix; index <= newSuffix; index += 1) {
+                diff.push({ type: 'add', text: newLines[index] });
+            }
+            for (let index = oldSuffix + 1; index < oldLines.length; index += 1) {
+                diff.push({ type: 'context', text: oldLines[index] });
+            }
+
+            return diff;
+        }
+
+        function serializeSmartDiffValue(value) {
+            return JSON.stringify(normalizeDraftForDiff(value));
+        }
+
+        function smartDiffValuesEqual(left, right) {
+            return serializeSmartDiffValue(left) === serializeSmartDiffValue(right);
+        }
+
+        function describeTemplateForSmartDiff(templateId) {
+            const value = String(templateId || '').trim();
+            if (!value) {
+                return '(none)';
+            }
+            const template = templateById[value];
+            return template?.name ? `${template.name} (${value})` : value;
+        }
+
+        function describeTargetRefForSmartDiff(raw, inheritLabel = 'Ask each time') {
+            const ref = parseWorkflowTargetRef(raw);
+            if (ref.mode === 'inherit') {
+                return inheritLabel;
+            }
+            if (ref.mode === 'targetId') {
+                const target = targetById[String(ref.targetId || '').trim()];
+                if (!target) {
+                    return String(ref.targetId || '').trim() || '(none)';
+                }
+                const type = String(target.type || '').trim();
+                return type ? `${target.name} (${type})` : String(target.name || ref.targetId || '');
+            }
+            return ref.fromEnvironment ? `Environment target "${ref.fromEnvironment}"` : inheritLabel;
+        }
+
+        function describeInputContractEntryForSmartDiff(entry) {
+            const item = isPlainObject(entry) ? entry : {};
+            return {
+                name: String(item.name || '').trim(),
+                label: String(item.label || '').trim(),
+                type: String(item.type || 'string').trim(),
+                required: !!item.required,
+                default: item.default ?? '',
+                description: String(item.description || '').trim(),
+                options: Array.isArray(item.options) ? item.options : [],
+            };
+        }
+
+        function describeStepForSmartDiff(step) {
+            const item = isPlainObject(step) ? step : {};
+            return {
+                template: describeTemplateForSmartDiff(item.templateId),
+                target: describeTargetRefForSmartDiff(item.target, 'Workflow default'),
+                dependsOn: Array.isArray(item.dependsOn) ? item.dependsOn.map(String).filter(Boolean) : [],
+                onFailure: String(item.onFailure || 'stop'),
+                inputs: isPlainObject(item.inputs) ? item.inputs : {},
+                secrets: isPlainObject(item.secrets) ? item.secrets : {},
+            };
+        }
+
+        function createSmartDiffItem(kind, title, beforeValue, afterValue, detail = '') {
+            return {
+                kind: ['added', 'removed', 'changed', 'moved'].includes(kind) ? kind : 'changed',
+                title: String(title || '').trim(),
+                beforeValue,
+                afterValue,
+                detail: String(detail || '').trim(),
+            };
+        }
+
+        function renderSmartDiffValue(value, emptyLabel) {
+            if (value === undefined) {
+                return `<div class="studio-smart-diff-placeholder">${escapeHtml(emptyLabel || 'No value')}</div>`;
+            }
+            if (value === null) {
+                return '<pre class="studio-smart-diff-code">null</pre>';
+            }
+            if (typeof value === 'string') {
+                if (value === '') {
+                    return `<div class="studio-smart-diff-placeholder">${escapeHtml(emptyLabel || '(empty)')}</div>`;
+                }
+                return `<pre class="studio-smart-diff-code">${escapeHtml(value)}</pre>`;
+            }
+            return `<pre class="studio-smart-diff-code">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
+        }
+
+        function renderWorkflowSmartDiff(smartData) {
+            if (!smartData || !Array.isArray(smartData.sections) || !smartData.sections.length) {
+                return '<div class="studio-diff-empty">No workflow-aware changes detected.</div>';
+            }
+
+            const badges = [
+                ['added', 'Added'],
+                ['removed', 'Removed'],
+                ['changed', 'Changed'],
+                ['moved', 'Moved'],
+            ].filter(([key]) => Number(smartData.summary?.[key] || 0) > 0)
+                .map(([key, label]) => `
+                    <span class="studio-smart-diff-summary-badge ${escapeHtml(key)}">
+                        ${escapeHtml(label)}: ${escapeHtml(String(smartData.summary[key]))}
+                    </span>
+                `)
+                .join('');
+
+            return `
+                <div class="studio-smart-diff">
+                    <div class="studio-smart-diff-summary">${badges}</div>
+                    ${smartData.sections.map((section) => `
+                        <section class="studio-smart-diff-section">
+                            <div class="studio-smart-diff-section-head">
+                                <div class="studio-smart-diff-section-title">${escapeHtml(section.title || 'Changes')}</div>
+                                <div class="studio-smart-diff-section-count">${escapeHtml(String((section.items || []).length))} change${(section.items || []).length === 1 ? '' : 's'}</div>
+                            </div>
+                            <div class="studio-smart-diff-items">
+                                ${(section.items || []).map((item) => `
+                                    <div class="studio-smart-diff-item">
+                                        <div class="studio-smart-diff-item-head">
+                                            <span class="studio-smart-diff-item-badge ${escapeHtml(item.kind || 'changed')}">${escapeHtml(item.kind || 'changed')}</span>
+                                            <div class="studio-smart-diff-item-title">${escapeHtml(item.title || 'Change')}</div>
+                                        </div>
+                                        ${item.detail ? `<div class="studio-smart-diff-item-copy">${escapeHtml(item.detail)}</div>` : ''}
+                                        <div class="studio-smart-diff-item-grid">
+                                            <div class="studio-smart-diff-panel">
+                                                <div class="studio-smart-diff-panel-label">Before</div>
+                                                ${renderSmartDiffValue(item.beforeValue, item.kind === 'added' ? 'Not present' : 'No value')}
+                                            </div>
+                                            <div class="studio-smart-diff-panel">
+                                                <div class="studio-smart-diff-panel-label">After</div>
+                                                ${renderSmartDiffValue(item.afterValue, item.kind === 'removed' ? 'Removed' : 'No value')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </section>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function addWorkflowObjectFieldSmartDiff(section, titlePrefix, beforeObject, afterObject) {
+            const beforeValue = isPlainObject(beforeObject) ? beforeObject : {};
+            const afterValue = isPlainObject(afterObject) ? afterObject : {};
+            const keys = Array.from(new Set([
+                ...Object.keys(beforeValue),
+                ...Object.keys(afterValue),
+            ])).sort((left, right) => left.localeCompare(right));
+
+            keys.forEach((key) => {
+                const hasBefore = Object.prototype.hasOwnProperty.call(beforeValue, key);
+                const hasAfter = Object.prototype.hasOwnProperty.call(afterValue, key);
+                if (hasBefore && !hasAfter) {
+                    section.items.push(createSmartDiffItem('removed', `${titlePrefix} ${key}`, beforeValue[key], undefined));
+                    return;
+                }
+                if (!hasBefore && hasAfter) {
+                    section.items.push(createSmartDiffItem('added', `${titlePrefix} ${key}`, undefined, afterValue[key]));
+                    return;
+                }
+                if (!smartDiffValuesEqual(beforeValue[key], afterValue[key])) {
+                    section.items.push(createSmartDiffItem('changed', `${titlePrefix} ${key}`, beforeValue[key], afterValue[key]));
+                }
+            });
+        }
+
+        function buildWorkflowSmartDiffData(beforeDraft, afterDraft) {
+            const beforeWorkflow = isPlainObject(beforeDraft) ? beforeDraft : {};
+            const afterWorkflow = isPlainObject(afterDraft) ? afterDraft : {};
+            const sections = [];
+
+            const workflowSection = { title: 'Workflow', items: [] };
+            [
+                ['id', 'Runtime ID'],
+                ['name', 'Name'],
+                ['description', 'Description'],
+                ['executionMode', 'Execution mode'],
+                ['maxParallel', 'Max parallel'],
+                ['finalStatusPolicy', 'Final status policy'],
+                ['environment', 'Environment'],
+                ['enabled', 'Enabled'],
+                ['tags', 'Tags'],
+                ['icon', 'Icon'],
+                ['color', 'Color'],
+            ].forEach(([key, label]) => {
+                if (!smartDiffValuesEqual(beforeWorkflow[key], afterWorkflow[key])) {
+                    workflowSection.items.push(createSmartDiffItem('changed', label, beforeWorkflow[key], afterWorkflow[key]));
+                }
+            });
+            if (!smartDiffValuesEqual(beforeWorkflow.defaultTarget, afterWorkflow.defaultTarget)) {
+                workflowSection.items.push(createSmartDiffItem(
+                    'changed',
+                    'Default target',
+                    describeTargetRefForSmartDiff(beforeWorkflow.defaultTarget, 'Ask each time'),
+                    describeTargetRefForSmartDiff(afterWorkflow.defaultTarget, 'Ask each time')
+                ));
+            }
+            if (workflowSection.items.length) {
+                sections.push(workflowSection);
+            }
+
+            const runtimeSection = { title: 'Runtime Contract', items: [] };
+            const beforeInputs = Array.isArray(beforeWorkflow.inputContract) ? beforeWorkflow.inputContract : [];
+            const afterInputs = Array.isArray(afterWorkflow.inputContract) ? afterWorkflow.inputContract : [];
+            const beforeInputMap = new Map(beforeInputs.map((item) => [String(item?.name || '').trim(), item]).filter(([name]) => name));
+            const afterInputMap = new Map(afterInputs.map((item) => [String(item?.name || '').trim(), item]).filter(([name]) => name));
+            const inputNames = Array.from(new Set([...beforeInputMap.keys(), ...afterInputMap.keys()])).sort((left, right) => left.localeCompare(right));
+            inputNames.forEach((name) => {
+                const beforeItem = beforeInputMap.get(name);
+                const afterItem = afterInputMap.get(name);
+                if (beforeItem && !afterItem) {
+                    runtimeSection.items.push(createSmartDiffItem('removed', `Removed input ${name}`, describeInputContractEntryForSmartDiff(beforeItem), undefined));
+                    return;
+                }
+                if (!beforeItem && afterItem) {
+                    runtimeSection.items.push(createSmartDiffItem('added', `Added input ${name}`, undefined, describeInputContractEntryForSmartDiff(afterItem)));
+                    return;
+                }
+                if (!smartDiffValuesEqual(beforeItem, afterItem)) {
+                    runtimeSection.items.push(createSmartDiffItem('changed', `Updated input ${name}`, describeInputContractEntryForSmartDiff(beforeItem), describeInputContractEntryForSmartDiff(afterItem)));
+                }
+            });
+
+            if (!smartDiffValuesEqual(beforeWorkflow.inputs, afterWorkflow.inputs)) {
+                runtimeSection.items.push(createSmartDiffItem('changed', 'Runtime inputs/defaults', beforeWorkflow.inputs, afterWorkflow.inputs));
+            }
+            if (!smartDiffValuesEqual(beforeWorkflow.secrets, afterWorkflow.secrets)) {
+                runtimeSection.items.push(createSmartDiffItem('changed', 'Secret mappings', beforeWorkflow.secrets, afterWorkflow.secrets));
+            }
+            if (runtimeSection.items.length) {
+                sections.push(runtimeSection);
+            }
+
+            const stepSection = { title: 'Steps', items: [] };
+            const beforeSteps = Array.isArray(beforeWorkflow.steps) ? beforeWorkflow.steps.filter(isPlainObject) : [];
+            const afterSteps = Array.isArray(afterWorkflow.steps) ? afterWorkflow.steps.filter(isPlainObject) : [];
+            const beforeStepMap = new Map(beforeSteps.map((step, index) => [String(step.id || `step-${index + 1}`), { step, index }]));
+            const afterStepMap = new Map(afterSteps.map((step, index) => [String(step.id || `step-${index + 1}`), { step, index }]));
+            const stepIds = Array.from(new Set([...beforeStepMap.keys(), ...afterStepMap.keys()])).sort((left, right) => {
+                const leftIndex = afterStepMap.get(left)?.index ?? beforeStepMap.get(left)?.index ?? 0;
+                const rightIndex = afterStepMap.get(right)?.index ?? beforeStepMap.get(right)?.index ?? 0;
+                return leftIndex - rightIndex;
+            });
+
+            stepIds.forEach((stepId) => {
+                const beforeEntry = beforeStepMap.get(stepId);
+                const afterEntry = afterStepMap.get(stepId);
+                if (beforeEntry && !afterEntry) {
+                    stepSection.items.push(createSmartDiffItem(
+                        'removed',
+                        `Removed step ${stepId}`,
+                        describeStepForSmartDiff(beforeEntry.step),
+                        undefined,
+                        `Template: ${describeTemplateForSmartDiff(beforeEntry.step.templateId)}`
+                    ));
+                    return;
+                }
+                if (!beforeEntry && afterEntry) {
+                    stepSection.items.push(createSmartDiffItem(
+                        'added',
+                        `Added step ${stepId}`,
+                        undefined,
+                        describeStepForSmartDiff(afterEntry.step),
+                        `Template: ${describeTemplateForSmartDiff(afterEntry.step.templateId)}`
+                    ));
+                    return;
+                }
+
+                if (beforeEntry.index !== afterEntry.index) {
+                    stepSection.items.push(createSmartDiffItem(
+                        'moved',
+                        `Moved step ${stepId}`,
+                        `Position ${beforeEntry.index + 1}`,
+                        `Position ${afterEntry.index + 1}`
+                    ));
+                }
+
+                if (!smartDiffValuesEqual(beforeEntry.step.templateId, afterEntry.step.templateId)) {
+                    stepSection.items.push(createSmartDiffItem(
+                        'changed',
+                        `Updated ${stepId} template`,
+                        describeTemplateForSmartDiff(beforeEntry.step.templateId),
+                        describeTemplateForSmartDiff(afterEntry.step.templateId)
+                    ));
+                }
+                if (!smartDiffValuesEqual(beforeEntry.step.target, afterEntry.step.target)) {
+                    stepSection.items.push(createSmartDiffItem(
+                        'changed',
+                        `Updated ${stepId} target`,
+                        describeTargetRefForSmartDiff(beforeEntry.step.target, 'Workflow default'),
+                        describeTargetRefForSmartDiff(afterEntry.step.target, 'Workflow default')
+                    ));
+                }
+                if (!smartDiffValuesEqual(beforeEntry.step.dependsOn, afterEntry.step.dependsOn)) {
+                    stepSection.items.push(createSmartDiffItem(
+                        'changed',
+                        `Updated ${stepId} dependencies`,
+                        Array.isArray(beforeEntry.step.dependsOn) ? beforeEntry.step.dependsOn : [],
+                        Array.isArray(afterEntry.step.dependsOn) ? afterEntry.step.dependsOn : []
+                    ));
+                }
+                if (!smartDiffValuesEqual(beforeEntry.step.onFailure, afterEntry.step.onFailure)) {
+                    stepSection.items.push(createSmartDiffItem(
+                        'changed',
+                        `Updated ${stepId} onFailure`,
+                        beforeEntry.step.onFailure ?? 'stop',
+                        afterEntry.step.onFailure ?? 'stop'
+                    ));
+                }
+                addWorkflowObjectFieldSmartDiff(stepSection, `${stepId} input`, beforeEntry.step.inputs, afterEntry.step.inputs);
+                addWorkflowObjectFieldSmartDiff(stepSection, `${stepId} secret`, beforeEntry.step.secrets, afterEntry.step.secrets);
+            });
+
+            if (stepSection.items.length) {
+                sections.push(stepSection);
+            }
+
+            const summary = sections.reduce((acc, section) => {
+                (section.items || []).forEach((item) => {
+                    acc.total += 1;
+                    acc[item.kind] = (acc[item.kind] || 0) + 1;
+                });
+                return acc;
+            }, { total: 0, added: 0, removed: 0, changed: 0, moved: 0 });
+
+            return {
+                sections,
+                summary,
+            };
+        }
+
+        function getAiConversationForRequest() {
+            return (Array.isArray(studioState.aiMessages) ? studioState.aiMessages : [])
+                .slice(-6)
+                .map((message) => ({
+                    role: message.role === 'assistant' ? 'assistant' : 'user',
+                    content: String(message.content || '').trim(),
+                }))
+                .filter((message) => message.content);
+        }
+
+        function getPendingAiDiffData() {
+            const message = getPendingAiDraftMessage();
+            if (!message) {
+                return null;
+            }
+
+            const beforeDraft = message.draftBefore && typeof message.draftBefore === 'object'
+                ? deepClone(message.draftBefore)
+                : {};
+            const afterDraft = message.draftAfter && typeof message.draftAfter === 'object'
+                ? deepClone(message.draftAfter)
+                : {};
+            const beforeText = serializeDraftForDiff(message.draftBefore || {});
+            const afterText = serializeDraftForDiff(message.draftAfter || {});
+            const rows = diffDraftLines(beforeText, afterText);
+            const stats = rows.reduce((acc, row) => {
+                if (row.type === 'add') acc.additions += 1;
+                if (row.type === 'delete') acc.deletions += 1;
+                return acc;
+            }, { additions: 0, deletions: 0 });
+            const smartData = studioState.type === 'workflow'
+                ? buildWorkflowSmartDiffData(beforeDraft, afterDraft)
+                : null;
+
+            return {
+                message,
+                path: studioState.type === 'template' ? 'template.json' : 'workflow.json',
+                beforeDraft,
+                afterDraft,
+                rows,
+                stats,
+                smartData,
+            };
         }
 
         function renderAiMessages() {
             if (!aiMessagesEl) {
+                renderAiPlan();
                 return;
             }
 
@@ -3709,9 +5359,11 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             if (!messages.length) {
                 if (!studioState.aiEnabled) {
                     aiMessagesEl.innerHTML = '<div class="studio-ai-empty">Studio AI is disabled for this account.</div>';
+                    renderAiPlan();
                     return;
                 }
                 aiMessagesEl.innerHTML = `<div class="studio-ai-empty">${studioState.aiProviders.length ? `Ask AI to create a ${studioState.type} or improve the one you are editing.` : 'No AI providers are configured yet. Add one in AI Administration first.'}</div>`;
+                renderAiPlan();
                 return;
             }
 
@@ -3719,10 +5371,11 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 const notes = Array.isArray(message.notes) ? message.notes : [];
                 const validationHtml = buildValidationMessageHtml(message.validation);
                 const versionHtml = buildVersionMessageHtml(message.versions);
+                const actionHtml = renderAiActions(message);
                 const metaParts = [];
                 if (message.providerName) metaParts.push(message.providerName);
                 if (message.modelName) metaParts.push(message.modelName);
-                if (message.applied) metaParts.push('Updated editor');
+                if (message.applied && !message.reverted) metaParts.push('Applied to editor');
 
                 return `
                     <div class="studio-ai-message ${escapeHtml(message.role)}">
@@ -3735,11 +5388,435 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                             ${versionHtml}
                             ${metaParts.length ? `<div class="studio-ai-meta">${escapeHtml(metaParts.join(' · '))}</div>` : ''}
                         </div>
+                        ${actionHtml}
+                        ${message.reverted ? '<div class="studio-ai-actions"><span class="studio-ai-flag reverted"><i class="fas fa-rotate-left"></i> Reverted</span></div>' : ''}
                     </div>
                 `;
             }).join('');
 
+            aiMessagesEl.querySelectorAll('[data-ai-action-kind]').forEach((button) => {
+                button.addEventListener('click', async () => {
+                    try {
+                        await handleAiMessageAction(button.dataset.aiActionKind || '', {
+                            messageId: button.dataset.aiMessageId || '',
+                            capability: button.dataset.aiCapability || '',
+                        });
+                    } catch (error) {
+                        // Action handlers already surface their own status/toast messages.
+                    }
+                });
+            });
+
             aiMessagesEl.scrollTop = aiMessagesEl.scrollHeight;
+            renderAiPlan();
+        }
+
+        function renderAiActions(message) {
+            const actions = getAiActionsForMessage(message);
+            if (!actions.length) {
+                return '';
+            }
+
+            return `
+                <div class="studio-ai-actions">
+                    ${actions.map((action) => `
+                        <button
+                            class="studio-btn secondary"
+                            type="button"
+                            data-ai-action-kind="${escapeHtml(action.kind || '')}"
+                            data-ai-capability="${escapeHtml(action.capability || '')}"
+                            data-ai-message-id="${escapeHtml(message.id || '')}"
+                            ${studioState.aiActionBusy ? 'disabled' : ''}
+                        >
+                            ${escapeHtml(action.label || 'Action')}
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function getAiActionsForMessage(message) {
+            const actions = [];
+            const seen = new Set();
+
+            const addAction = (action) => {
+                if (!action || !action.kind) {
+                    return;
+                }
+                const key = `${action.kind}::${action.capability || ''}`;
+                if (seen.has(key)) {
+                    return;
+                }
+                seen.add(key);
+                actions.push(action);
+            };
+
+            (Array.isArray(message.actions) ? message.actions : []).forEach((action) => addAction(action));
+
+            if (message.role === 'assistant' && message.applied && !message.reverted && message.draftBefore) {
+                addAction({
+                    kind: 'revert-ai-draft',
+                    label: 'Revert',
+                });
+            }
+
+            const validation = message.validation && typeof message.validation === 'object' ? message.validation : null;
+            if (studioState.type === 'workflow' && validation && !message.applied) {
+                const gaps = Array.isArray(validation.capabilityGaps) ? validation.capabilityGaps : [];
+                gaps.forEach((gap) => {
+                    const capability = String(gap?.capability || '').trim();
+                    if (!capability) {
+                        return;
+                    }
+                    addAction({
+                        kind: 'create-missing-template',
+                        capability,
+                        label: `Create template for ${gap?.label || formatCapabilityLabel(capability)}`,
+                    });
+                });
+            }
+
+            return actions;
+        }
+
+        async function handleAiMessageAction(kind, payload = {}) {
+            if (kind === 'revert-ai-draft') {
+                await revertAiDraftMessage(String(payload.messageId || ''));
+                return;
+            }
+
+            if (kind === 'create-missing-template') {
+                const capability = String(payload.capability || '').trim();
+                if (!capability) {
+                    return;
+                }
+                await createTemplateForCapabilityGap(capability);
+                return;
+            }
+
+            if (kind === 'resume-workflow') {
+                await resumeBlockedWorkflow();
+            }
+        }
+
+        function renderAiPlan() {
+            if (!aiPlanBoxEl || !aiPlanSummaryEl || !aiPlanListEl || !aiPlanNotesEl || !aiViewDiffBtn || !aiSmartDiffBtn || !aiApplyBtn || !aiClearPlanBtn) {
+                return;
+            }
+
+            const diffData = getPendingAiDiffData();
+            aiSmartDiffBtn.hidden = studioState.type !== 'workflow';
+            if (!diffData) {
+                aiPlanBoxEl.classList.remove('visible');
+                aiPlanSummaryEl.textContent = 'No proposed changes yet.';
+                aiPlanListEl.innerHTML = '';
+                aiPlanNotesEl.innerHTML = '';
+                aiPlanNotesEl.style.display = 'none';
+                if (aiPlanLintBoxEl) aiPlanLintBoxEl.style.display = 'none';
+                if (aiPlanLintListEl) aiPlanLintListEl.innerHTML = '';
+                aiViewDiffBtn.disabled = true;
+                aiSmartDiffBtn.disabled = true;
+                aiApplyBtn.disabled = true;
+                aiClearPlanBtn.disabled = true;
+                return;
+            }
+
+            const { message, path, stats } = diffData;
+            aiPlanBoxEl.classList.add('visible');
+            aiPlanSummaryEl.textContent = String(message.title || 'Proposed workflow changes.');
+            aiPlanListEl.innerHTML = `
+                <li class="studio-ai-plan-item">
+                    <span class="studio-ai-plan-badge">write</span>
+                    <span class="studio-ai-plan-path" title="${escapeHtml(path)}">${escapeHtml(path)}</span>
+                </li>
+            `;
+
+            const notes = Array.isArray(message.notes) ? message.notes.filter(Boolean) : [];
+            aiPlanNotesEl.innerHTML = notes.map((note) => `<li>${escapeHtml(note)}</li>`).join('');
+            aiPlanNotesEl.style.display = notes.length ? 'block' : 'none';
+
+            const lintItems = [];
+            const validation = message.validation && typeof message.validation === 'object' ? message.validation : null;
+            (validation?.errors || []).forEach((item) => {
+                lintItems.push({
+                    title: 'Validation error',
+                    message: String(item || ''),
+                    severity: 'danger',
+                });
+            });
+            (validation?.warnings || []).forEach((item) => {
+                lintItems.push({
+                    title: 'Validation warning',
+                    message: String(item || ''),
+                    severity: 'warning',
+                });
+            });
+
+            const hasBlockingLint = lintItems.some((item) => item.severity === 'danger');
+            if (aiPlanLintBoxEl && aiPlanLintListEl) {
+                if (lintItems.length) {
+                    aiPlanLintBoxEl.style.display = 'block';
+                    aiPlanLintBoxEl.classList.toggle('danger', hasBlockingLint);
+                    aiPlanLintListEl.innerHTML = lintItems.map((item) => `
+                        <li class="studio-ai-plan-lint-item ${item.severity === 'danger' ? 'danger' : ''}">
+                            <div class="studio-ai-plan-lint-item-title">${escapeHtml(item.title)}</div>
+                            <div class="studio-ai-plan-lint-item-meta">${escapeHtml(path)}</div>
+                            <div class="studio-ai-plan-lint-item-message">${escapeHtml(item.message)}</div>
+                        </li>
+                    `).join('');
+                } else {
+                    aiPlanLintBoxEl.style.display = 'none';
+                    aiPlanLintBoxEl.classList.remove('danger');
+                    aiPlanLintListEl.innerHTML = '';
+                }
+            }
+
+            const noChanges = stats.additions === 0 && stats.deletions === 0;
+            const smartDiffAvailable = studioState.type === 'workflow' && Number(diffData.smartData?.summary?.total || 0) > 0;
+            aiViewDiffBtn.disabled = studioState.aiActionBusy || noChanges;
+            aiSmartDiffBtn.disabled = studioState.aiActionBusy || !smartDiffAvailable;
+            aiApplyBtn.disabled = studioState.aiActionBusy;
+            aiClearPlanBtn.disabled = studioState.aiActionBusy;
+        }
+
+        function renderAiDiffModal() {
+            if (!aiDiffFilesEl || !aiDiffMetaEl || !aiDiffContentEl || !aiDiffApplyBtn) {
+                return;
+            }
+
+            const diffData = getPendingAiDiffData();
+            if (!diffData) {
+                aiDiffFilesEl.innerHTML = '<div class="studio-diff-empty">No pending changes.</div>';
+                aiDiffMetaEl.innerHTML = `
+                    <div class="studio-diff-meta-main">
+                        <div class="studio-diff-meta-path">No file selected</div>
+                        <div class="studio-diff-meta-copy">Select a changed file to inspect the proposed diff.</div>
+                    </div>
+                `;
+                aiDiffContentEl.innerHTML = '<div class="studio-diff-empty">No pending changes.</div>';
+                aiDiffApplyBtn.disabled = true;
+                return;
+            }
+
+            const { path, rows, stats, smartData } = diffData;
+            const smartDiffAvailable = studioState.type === 'workflow' && Number(smartData?.summary?.total || 0) > 0;
+            const mode = smartDiffAvailable && studioState.aiDiffMode === 'smart' ? 'smart' : 'raw';
+            const smartSummary = smartData?.summary || { total: 0 };
+            studioState.aiDiffMode = mode;
+            aiDiffFilesEl.innerHTML = `
+                <button type="button" class="studio-diff-file active">
+                    <span class="studio-diff-file-path" title="${escapeHtml(path)}">${escapeHtml(path)}</span>
+                    <span class="studio-diff-file-meta">
+                        <span class="studio-ai-plan-badge">write</span>
+                        <span>${mode === 'smart' ? `${escapeHtml(String(smartSummary.total || 0))} changes` : `${stats.additions}+`}</span>
+                        <span>${mode === 'smart' ? `${escapeHtml(String((smartSummary.added || 0) + (smartSummary.removed || 0)))} structural` : `${stats.deletions}-`}</span>
+                    </span>
+                </button>
+            `;
+            aiDiffMetaEl.innerHTML = `
+                <div class="studio-diff-meta-main">
+                    <div class="studio-diff-meta-path">${escapeHtml(path)}</div>
+                    <div class="studio-diff-meta-copy">${escapeHtml(mode === 'smart' ? 'Workflow-aware review of the proposed changes.' : 'Replaces the current editor content with the proposed version.')}</div>
+                </div>
+                <div class="studio-diff-toolbar">
+                    <div class="studio-diff-mode-toggle">
+                        <button type="button" class="studio-diff-mode-btn ${mode === 'raw' ? 'active' : ''}" data-ai-diff-mode="raw">Raw Diff</button>
+                        <button type="button" class="studio-diff-mode-btn ${mode === 'smart' ? 'active' : ''}" data-ai-diff-mode="smart" ${smartDiffAvailable ? '' : 'disabled'}>Smart Diff</button>
+                    </div>
+                    <span class="studio-diff-meta-badge">write</span>
+                </div>
+            `;
+            aiDiffContentEl.innerHTML = mode === 'smart'
+                ? renderWorkflowSmartDiff(smartData)
+                : (rows.length ? buildAiDiffRows(rows) : '<div class="studio-diff-empty">No line changes detected.</div>');
+            aiDiffMetaEl.querySelectorAll('[data-ai-diff-mode]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const nextMode = button.getAttribute('data-ai-diff-mode') || 'raw';
+                    if (nextMode === 'smart' && !smartDiffAvailable) {
+                        return;
+                    }
+                    studioState.aiDiffMode = nextMode;
+                    renderAiDiffModal();
+                });
+            });
+            aiDiffApplyBtn.disabled = studioState.aiActionBusy;
+        }
+
+        function openAiDiffModal(mode = 'raw') {
+            const message = getPendingAiDraftMessage();
+            if (!message || !aiDiffModalEl) {
+                return;
+            }
+            studioState.aiDiffMessageId = String(message.id || '');
+            studioState.aiDiffMode = mode === 'smart' ? 'smart' : 'raw';
+            aiDiffModalEl.classList.add('active');
+            renderAiDiffModal();
+        }
+
+        function closeAiDiffModal() {
+            aiDiffModalEl?.classList.remove('active');
+            studioState.aiDiffMessageId = '';
+            studioState.aiDiffMode = 'raw';
+        }
+
+        function clearAiPendingChange() {
+            studioState.pendingAiDraftMessageId = '';
+            closeAiDiffModal();
+            renderAiPlan();
+        }
+
+        async function applyAiPlan() {
+            const message = getPendingAiDraftMessage();
+            if (!message || !message.draftAfter) {
+                return;
+            }
+
+            const currentDraft = readDraftJson(false)
+                || deepClone(getSelectedProject()?.draft || studioState.defaults[studioState.type] || {});
+            const baselineDraft = message.draftBefore || {};
+
+            if ((!message.applied || message.reverted) && !draftsEqual(currentDraft, baselineDraft)) {
+                const confirmed = window.confirm('Applying these AI changes will replace the current editor state with the proposed version. Continue?');
+                if (!confirmed) {
+                    return;
+                }
+            }
+
+            studioState.aiActionBusy = true;
+            renderAiMessages();
+            renderAiPlan();
+            renderAiDiffModal();
+
+            try {
+                applyDraftToEditor(message.draftAfter, message.validation || null);
+                appendAiMessage('assistant', 'Applied AI changes.', {
+                    providerName: message.providerName,
+                    modelName: message.modelName,
+                    applied: true,
+                    validation: message.validation || null,
+                    validationBefore: message.validationBefore || null,
+                    draftBefore: message.draftBefore || null,
+                    draftAfter: message.draftAfter || null,
+                });
+                studioState.pendingAiDraftMessageId = '';
+                closeAiDiffModal();
+                editorStatusLineEl.textContent = 'Applied AI changes to the editor. Review them, then save when you are happy.';
+                window.Toast?.success?.('Applied AI changes');
+            } finally {
+                studioState.aiActionBusy = false;
+                renderAiMessages();
+                renderAiPlan();
+                renderAiDiffModal();
+            }
+        }
+
+        async function revertAiDraftMessage(messageId) {
+            const message = getAiMessageById(messageId);
+            if (!message || !message.applied || message.reverted || !message.draftBefore) {
+                return;
+            }
+
+            const currentDraft = readDraftJson(false)
+                || deepClone(getSelectedProject()?.draft || studioState.defaults[studioState.type] || {});
+            const expectedAppliedDraft = message.draftAfter || {};
+            const confirmMessage = draftsEqual(currentDraft, expectedAppliedDraft)
+                ? 'Revert these AI changes and restore the previous editor state?'
+                : 'The editor has changed since these AI changes were applied. Reverting will replace the current editor state with the previous version. Continue?';
+            if (!window.confirm(confirmMessage)) {
+                return;
+            }
+
+            studioState.aiActionBusy = true;
+            renderAiMessages();
+            renderAiPlan();
+
+            try {
+                applyDraftToEditor(message.draftBefore, message.validationBefore || null);
+                message.reverted = true;
+                appendAiMessage('assistant', 'Reverted AI changes.', {
+                    providerName: message.providerName,
+                    modelName: message.modelName,
+                });
+                editorStatusLineEl.textContent = 'Reverted the applied AI changes.';
+                window.Toast?.success?.('Reverted AI changes');
+            } finally {
+                studioState.aiActionBusy = false;
+                renderAiMessages();
+                renderAiPlan();
+            }
+        }
+
+        async function createTemplateForCapabilityGap(capability) {
+            const workflowDraft = readDraftJson(false)
+                || deepClone(getSelectedProject()?.draft || studioState.defaults.workflow || {});
+            const workflowConversation = deepClone(Array.isArray(studioState.aiMessages) ? studioState.aiMessages : []);
+            const workflowProject = getSelectedProject();
+            const gap = findCapabilityGapInValidation(studioState.currentValidation, capability);
+            const lastUserPrompt = getLastUserAiPrompt(workflowConversation);
+
+            studioState.pendingWorkflowResume = {
+                type: 'workflow',
+                projectId: studioState.selectedProjectId || '',
+                name: projectNameEl?.value?.trim?.() || workflowProject?.name || workflowDraft?.name || '',
+                description: projectDescriptionEl?.value?.trim?.() || workflowProject?.description || workflowDraft?.description || '',
+                runtimeId: runtimeIdEl?.value?.trim?.() || workflowProject?.commandId || workflowDraft?.id || '',
+                draft: deepClone(workflowDraft),
+                validation: deepClone(studioState.currentValidation || null),
+                aiMessages: workflowConversation,
+                versions: deepClone(Array.isArray(workflowProject?.versions) ? workflowProject.versions : []),
+                capability,
+                capabilityLabel: gap?.label || formatCapabilityLabel(capability),
+                capabilitySummary: gap?.summary || `This workflow needs ${capability}.`,
+                sourcePrompt: lastUserPrompt,
+            };
+
+            switchType('template');
+
+            const prompt = buildCapabilityTemplatePrompt(studioState.pendingWorkflowResume);
+            await requestAiDraftUpdate({
+                type: 'template',
+                prompt,
+                displayPrompt: `Create a reusable template for ${studioState.pendingWorkflowResume.capabilityLabel}.`,
+                currentDraft: deepClone(studioState.defaults.template || {}),
+                conversation: [],
+                currentValidation: null,
+                editMode: false,
+                busyText: 'Creating template with AI...',
+                successStatus: 'AI prepared a template to fill the missing capability. Review it, then publish when you are happy.',
+                successToast: 'Template draft ready',
+                fallbackProviderName: 'AI',
+                extraNotes: [
+                    `This template was requested because the blocked workflow is missing ${studioState.pendingWorkflowResume.capabilityLabel}.`,
+                    'Review and publish the template when it looks right. A resume action will appear after publish.',
+                ],
+            });
+        }
+
+        async function resumeBlockedWorkflow() {
+            const pending = studioState.pendingWorkflowResume;
+            if (!pending || pending.type !== 'workflow' || !pending.draft) {
+                editorStatusLineEl.textContent = 'No blocked workflow is waiting to resume.';
+                window.Toast?.error?.('No workflow to resume');
+                return;
+            }
+
+            const resumePrompt = buildResumeWorkflowPrompt(pending);
+            restoreWorkflowFromResumeState(pending);
+            studioState.pendingWorkflowResume = null;
+
+            await requestAiDraftUpdate({
+                type: 'workflow',
+                prompt: resumePrompt,
+                displayPrompt: `Continue this workflow now that ${pending.capabilityLabel} is available.`,
+                currentDraft: deepClone(pending.draft),
+                conversation: getAiConversationForRequest(),
+                currentValidation: deepClone(pending.validation || null),
+                editMode: true,
+                busyText: 'Continuing workflow with AI...',
+                successStatus: 'AI continued the workflow with the newly available capability. Review it, then save when you are happy.',
+                successToast: 'Workflow resumed',
+                fallbackProviderName: 'AI',
+            });
         }
 
         async function saveCurrentProject() {
@@ -3821,10 +5898,17 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 });
                 studioState.currentValidation = result.validation || null;
                 await refreshData(result.project?.id || studioState.selectedProjectId);
+                const postPublishActions = studioState.type === 'template' && studioState.pendingWorkflowResume
+                    ? [{
+                        kind: 'resume-workflow',
+                        label: `Return and continue ${studioState.pendingWorkflowResume.name || 'workflow'}`,
+                    }]
+                    : [];
                 appendAiMessage('assistant', `Published the current ${studioState.type} to runtime.`, {
                     title: 'Published',
                     validation: studioState.currentValidation,
                     versions: getSelectedProject()?.versions || [],
+                    actions: postPublishActions,
                 });
                 renderAiMessages();
                 editorStatusLineEl.textContent = `${studioState.type === 'template' ? 'Template' : 'Workflow'} published to runtime.`;
@@ -3931,6 +6015,84 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             }
         }
 
+        async function requestAiDraftUpdate(options = {}) {
+            const type = options.type === 'template' ? 'template' : 'workflow';
+            const prompt = String(options.prompt || '').trim();
+            if (!prompt) {
+                throw new Error('A prompt is required');
+            }
+
+            const currentDraft = isPlainObject(options.currentDraft) || Array.isArray(options.currentDraft)
+                ? deepClone(options.currentDraft)
+                : (deepClone(readDraftJson(false) || getSelectedProject()?.draft || studioState.defaults[type] || {}));
+            const conversation = Array.isArray(options.conversation)
+                ? deepClone(options.conversation)
+                : getAiConversationForRequest();
+            const currentValidation = options.currentValidation && typeof options.currentValidation === 'object'
+                ? deepClone(options.currentValidation)
+                : deepClone(studioState.currentValidation || null);
+            const displayPrompt = String(options.displayPrompt || prompt).trim() || prompt;
+            const editMode = typeof options.editMode === 'boolean'
+                ? options.editMode
+                : (!!studioState.selectedProjectId || conversation.some((message) => message.role === 'assistant'));
+
+            appendAiMessage('user', displayPrompt);
+            renderAiMessages();
+
+            if (options.clearPrompt !== false && aiPromptEl) {
+                aiPromptEl.value = '';
+            }
+
+            setBusy(true, String(options.busyText || 'Updating with AI...'));
+            try {
+                const result = await apiPost('generate-ai-draft', {
+                    type,
+                    providerId: aiProviderSelectEl?.value || '',
+                    prompt,
+                    currentDraft,
+                    conversation,
+                    currentValidation,
+                    editMode,
+                });
+
+                studioState.lastAiResult = result;
+                const extraNotes = Array.isArray(options.extraNotes) ? options.extraNotes : [];
+
+                const aiMessage = appendAiMessage('assistant', result.reply || `I updated the ${type}.`, {
+                    title: result.summary || 'Updated',
+                    notes: [...(result.notes || []), ...extraNotes],
+                    providerName: result.provider?.name || options.fallbackProviderName || 'AI',
+                    modelName: result.model || '',
+                    applied: false,
+                    reverted: false,
+                    validation: result.validation || null,
+                    validationBefore: currentValidation,
+                    versions: getSelectedProject()?.versions || [],
+                    actions: Array.isArray(options.actions) ? options.actions : [],
+                    draftBefore: currentDraft,
+                    draftAfter: result.draft || {},
+                });
+                studioState.pendingAiDraftMessageId = aiMessage?.draftAfter ? String(aiMessage.id || '') : '';
+                closeAiDiffModal();
+                renderAiMessages();
+                renderAiPlan();
+                editorStatusLineEl.textContent = String(options.successStatus || 'AI proposed changes. Review them in Pending Changes, then apply them to the editor if you want to keep them.');
+                window.Toast?.success?.(String(options.successToast || 'AI update ready'));
+                return result;
+            } catch (error) {
+                appendAiMessage('assistant', `I hit an error: ${error.message}`, {
+                    providerName: aiProviderSelectEl?.selectedOptions?.[0]?.textContent?.trim() || options.fallbackProviderName || 'AI',
+                });
+                renderAiMessages();
+                renderAiPlan();
+                editorStatusLineEl.textContent = error.message;
+                window.Toast?.error?.(error.message);
+                throw error;
+            } finally {
+                setBusy(false);
+            }
+        }
+
         async function generateAiDraft() {
             if (!studioState.aiEnabled) {
                 editorStatusLineEl.textContent = 'Studio AI is disabled for this account.';
@@ -3953,55 +6115,24 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
 
             const currentDraft = readDraftJson(false)
                 || deepClone(getSelectedProject()?.draft || studioState.defaults[studioState.type] || {});
-            appendAiMessage('user', prompt);
-            renderAiMessages();
-            if (aiPromptEl) {
-                aiPromptEl.value = '';
-            }
-            setBusy(true, 'Updating with AI...');
+            const conversation = getAiConversationForRequest();
+            const editMode = !!studioState.selectedProjectId
+                || conversation.some((message) => message.role === 'assistant');
             try {
-                const result = await apiPost('generate-ai-draft', {
+                await requestAiDraftUpdate({
                     type: studioState.type,
-                    providerId: aiProviderSelectEl?.value || '',
                     prompt,
                     currentDraft,
+                    conversation,
+                    currentValidation: studioState.currentValidation || null,
+                    editMode,
+                    busyText: 'Updating with AI...',
+                    successStatus: 'AI updated the editor. Review it, then save when you are happy.',
+                    successToast: 'AI update ready',
+                    fallbackProviderName: 'AI',
                 });
-
-                studioState.lastAiResult = result;
-                studioState.currentValidation = result.validation || null;
-                projectNameEl.value = result.draft?.name || projectNameEl.value;
-                runtimeIdEl.value = result.draft?.id || runtimeIdEl.value;
-                projectDescriptionEl.value = result.draft?.description || projectDescriptionEl.value;
-                draftJsonEl.value = JSON.stringify(result.draft || {}, null, 2);
-                draftJsonEl.dataset.lastSerialized = draftJsonEl.value;
-                if (studioState.type === 'workflow') {
-                    loadWorkflowBuilderDraft(result.draft || {});
-                    syncWorkflowDraftJsonFromBuilder(false);
-                }
-                studioState.isDirty = true;
-                setStatusBadge('draft');
-                renderUsePanel();
-                appendAiMessage('assistant', result.reply || `I updated the ${studioState.type}.`, {
-                    title: result.summary || 'Updated',
-                    notes: result.notes || [],
-                    providerName: result.provider?.name || 'AI',
-                    modelName: result.model || '',
-                    applied: true,
-                    validation: studioState.currentValidation,
-                    versions: getSelectedProject()?.versions || [],
-                });
-                renderAiMessages();
-                editorStatusLineEl.textContent = 'AI updated the editor. Review it, then save when you are happy.';
-                window.Toast?.success?.('AI update ready');
             } catch (error) {
-                appendAiMessage('assistant', `I hit an error: ${error.message}`, {
-                    providerName: aiProviderSelectEl?.selectedOptions?.[0]?.textContent?.trim() || 'AI',
-                });
-                renderAiMessages();
-                editorStatusLineEl.textContent = error.message;
-                window.Toast?.error?.(error.message);
-            } finally {
-                setBusy(false);
+                return;
             }
         }
 
@@ -4011,6 +6142,8 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             studioState.data.template = Array.isArray(result.templateProjects) ? result.templateProjects : [];
             studioState.defaults.workflow = result.workflowDefaults || studioState.defaults.workflow;
             studioState.defaults.template = result.templateDefaults || studioState.defaults.template;
+            studioState.runtimeTemplates = Array.isArray(result.runtimeTemplates) ? result.runtimeTemplates : studioState.runtimeTemplates;
+            rebuildRuntimeTemplateLookup();
             studioState.stats = result.stats || studioState.stats;
             updateStats();
             renderProjectList();
@@ -4522,8 +6655,24 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             return JSON.parse(JSON.stringify(value));
         }
 
+        function rebuildRuntimeTemplateLookup() {
+            templateById = Object.fromEntries(
+                (Array.isArray(studioState.runtimeTemplates) ? studioState.runtimeTemplates : [])
+                    .map((template) => [String(template?.id || ''), template])
+                    .filter(([id]) => id)
+            );
+        }
+
         function capitalize(value) {
             return String(value || '').replace(/[-_]/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+        }
+
+        function formatCapabilityLabel(capability) {
+            return String(capability || '')
+                .split('.')
+                .map((part) => capitalize(String(part || '').trim()))
+                .filter(Boolean)
+                .join(' / ') || 'Capability';
         }
 
         function formatProjectStatus(status) {
@@ -4557,6 +6706,116 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             } catch (error) {
                 return String(value ?? '');
             }
+        }
+
+        function getLastUserAiPrompt(messages = studioState.aiMessages) {
+            const items = Array.isArray(messages) ? messages : [];
+            for (let index = items.length - 1; index >= 0; index -= 1) {
+                const message = items[index];
+                if (message?.role === 'user' && String(message?.content || '').trim()) {
+                    return String(message.content).trim();
+                }
+            }
+            return '';
+        }
+
+        function findCapabilityGapInValidation(validation, capability) {
+            const normalized = String(capability || '').trim();
+            const gaps = Array.isArray(validation?.capabilityGaps) ? validation.capabilityGaps : [];
+            return gaps.find((gap) => String(gap?.capability || '').trim() === normalized) || null;
+        }
+
+        function summarizeWorkflowForCapabilityGap(draft) {
+            const safeDraft = draft && typeof draft === 'object' ? draft : {};
+            const steps = Array.isArray(safeDraft.steps) ? safeDraft.steps : [];
+            return {
+                id: safeDraft.id || '',
+                name: safeDraft.name || '',
+                description: safeDraft.description || '',
+                executionMode: safeDraft.executionMode || 'sync',
+                tags: Array.isArray(safeDraft.tags) ? safeDraft.tags : [],
+                inputContract: Array.isArray(safeDraft.inputContract)
+                    ? safeDraft.inputContract.map((input) => ({
+                        name: input?.name || '',
+                        type: input?.type || 'string',
+                        required: !!input?.required,
+                        description: input?.description || '',
+                    }))
+                    : [],
+                steps: steps.map((step) => ({
+                    id: step?.id || '',
+                    templateId: step?.templateId || '',
+                    dependsOn: Array.isArray(step?.dependsOn) ? step.dependsOn : [],
+                    onFailure: step?.onFailure || 'stop',
+                    target: step?.target || 'inherit',
+                })),
+            };
+        }
+
+        function buildCapabilityTemplatePrompt(resumeState) {
+            const workflowSummary = prettyJson(summarizeWorkflowForCapabilityGap(resumeState?.draft || {}));
+            const workflowIntent = String(resumeState?.sourcePrompt || '').trim();
+            const capability = String(resumeState?.capability || '').trim();
+            const capabilityLabel = resumeState?.capabilityLabel || formatCapabilityLabel(capability);
+            const gapSummary = String(resumeState?.capabilitySummary || '').trim();
+
+            return [
+                `Create a reusable template that fills this missing capability for Workflows Studio: ${capability}.`,
+                '',
+                'Requirements:',
+                '- create a reusable template draft, not a workflow draft',
+                '- keep it focused on this capability so other workflows can reuse it',
+                '- prefer a practical runtime and inputs that fit the job cleanly',
+                '- do not assume this template is only for one specific workflow',
+                '',
+                `Missing capability: ${capabilityLabel} (${capability})`,
+                gapSummary ? `Why it is needed: ${gapSummary}` : '',
+                workflowIntent ? `Original workflow request: ${workflowIntent}` : '',
+                '',
+                '[Blocked workflow summary]',
+                workflowSummary,
+                '[/Blocked workflow summary]',
+            ].filter(Boolean).join('\n');
+        }
+
+        function buildResumeWorkflowPrompt(resumeState) {
+            const capability = String(resumeState?.capability || '').trim();
+            const capabilityLabel = resumeState?.capabilityLabel || formatCapabilityLabel(capability);
+            const workflowIntent = String(resumeState?.sourcePrompt || '').trim();
+
+            return [
+                'Continue improving the current workflow now that the missing capability is available.',
+                capability ? `A template for ${capabilityLabel} (${capability}) has now been created and published.` : '',
+                workflowIntent ? `Original workflow request: ${workflowIntent}` : '',
+                'Update the workflow to use the newly available capability where it fits, while preserving the rest of the workflow unless changes are needed.',
+            ].filter(Boolean).join('\n');
+        }
+
+        function restoreWorkflowFromResumeState(resumeState) {
+            if (!resumeState) {
+                return;
+            }
+
+            switchType('workflow');
+
+            const transientProject = {
+                id: resumeState.projectId || '',
+                name: resumeState.name || resumeState.draft?.name || '',
+                description: resumeState.description || resumeState.draft?.description || '',
+                status: 'draft',
+                draft: deepClone(resumeState.draft || {}),
+                commandId: resumeState.runtimeId || resumeState.draft?.id || '',
+                versions: deepClone(Array.isArray(resumeState.versions) ? resumeState.versions : []),
+                lastValidation: deepClone(resumeState.validation || null),
+                lastPublished: null,
+            };
+
+            loadDraft(transientProject);
+            studioState.currentValidation = deepClone(resumeState.validation || null);
+            studioState.aiMessages = deepClone(Array.isArray(resumeState.aiMessages) ? resumeState.aiMessages : []);
+            renderAiMessages();
+            renderUsePanel();
+            editorStatusLineEl.textContent = `Returned to ${resumeState.name || 'the blocked workflow'} to continue.`;
         }
 
         function formatTargetRef(targetRef) {

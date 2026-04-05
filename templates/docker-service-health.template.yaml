@@ -13,6 +13,16 @@ targetType: docker
 icon: fas fa-heart-pulse
 color: "#1D4ED8"
 
+capabilityHints:
+  capabilities:
+    - container.inspect
+    - container.health
+    - text.format
+  payloadHandling:
+    - scalar-only
+    - small-text
+  scriptRuntime: sh
+
 runtime:
   image: docker:24-cli
 

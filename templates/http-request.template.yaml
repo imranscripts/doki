@@ -8,12 +8,23 @@
 
 id: http-request
 name: HTTP Request
-version: "2.0.0"
+version: "2.0.1"
 description: Make HTTP requests to APIs
 targetType: http    # Maps to 'http' target in environment
 
 icon: fas fa-globe
 color: "#FF9800"
+
+capabilityHints:
+  capabilities:
+    - http.fetch
+  payloadHandling:
+    - scalar-only
+    - small-text
+  scriptRuntime: sh
+  dataFlow:
+    requestPathInput: path
+    requestHeadersInput: headers
 
 # ============================================================================
 # RUNTIME - Container this template runs in
@@ -104,11 +115,15 @@ execution:
 
     # Extra headers from input (comma-separated: Header1:Value1,Header2:Value2)
     {{#if headers}}
-    _OLD_IFS="$IFS"; IFS=','
-    for _H in {{headers}}; do
+    _HEADERS_RAW="{{headers}}"
+    _OLD_IFS="$IFS"
+    IFS=','
+    set -f
+    for _H in $_HEADERS_RAW; do
       _H=$(echo "$_H" | sed 's/^ *//;s/ *$//')
       [ -n "$_H" ] && set -- "$@" -H "$_H"
     done
+    set +f
     IFS="$_OLD_IFS"
     {{/if}}
 

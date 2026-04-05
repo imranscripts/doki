@@ -235,17 +235,26 @@ class WorkflowStudioManager {
         $errors = array_merge($errors, $runtimeErrors);
         $warnings = array_merge($warnings, $runtimeWarnings);
 
+        ['errors' => $inputErrors, 'warnings' => $inputWarnings] = $this->lintWorkflowInputUsage($draft);
+        $errors = array_merge($errors, $inputErrors);
+        $warnings = array_merge($warnings, $inputWarnings);
+
         if (($draft['enabled'] ?? true) === false) {
             $warnings[] = 'This workflow is disabled and will not appear as runnable until it is enabled.';
         }
+
+        $errors = array_values(array_unique($errors));
+        $warnings = array_values(array_unique($warnings));
+        $capabilityGaps = $this->extractCapabilityGaps($errors, $warnings);
 
         return [
             'success' => true,
             'draft' => $draft,
             'validation' => [
                 'valid' => $errors === [],
-                'errors' => array_values(array_unique($errors)),
-                'warnings' => array_values(array_unique($warnings)),
+                'errors' => $errors,
+                'warnings' => $warnings,
+                'capabilityGaps' => $capabilityGaps,
                 'validatedAt' => date('c'),
             ],
         ];
@@ -413,7 +422,7 @@ class WorkflowStudioManager {
             $draft['inputs'] ?? [],
             $draft['inputContract'] ?? []
         );
-        $draft['secrets'] = is_array($draft['secrets'] ?? null) ? $draft['secrets'] : [];
+        $draft['secrets'] = $this->normalizeSecretsMap($draft['secrets'] ?? []);
         $draft['tags'] = $this->normalizeStringList($draft['tags'] ?? []);
         $draft['icon'] = $draft['icon'] ?? null;
         $draft['color'] = $draft['color'] ?? null;
@@ -513,6 +522,8 @@ class WorkflowStudioManager {
     }
 
     private function buildDefaultDraft(): array {
+        $starterStep = $this->buildDefaultStarterStep();
+
         return [
             'id' => '',
             'name' => '',
@@ -522,17 +533,7 @@ class WorkflowStudioManager {
             'finalStatusPolicy' => 'fail_if_any_failed',
             'defaultTarget' => 'inherit',
             'environment' => null,
-            'steps' => [
-                [
-                    'id' => 'step-1',
-                    'templateId' => 'shell-exec',
-                    'target' => 'inherit',
-                    'dependsOn' => [],
-                    'onFailure' => 'stop',
-                    'inputs' => ['command' => 'echo "Hello from Workflows Studio"'],
-                    'secrets' => [],
-                ],
-            ],
+            'steps' => $starterStep !== null ? [$starterStep] : [],
             'inputs' => [],
             'inputContract' => [],
             'secrets' => [],
@@ -541,6 +542,32 @@ class WorkflowStudioManager {
             'color' => null,
             'enabled' => true,
         ];
+    }
+
+    private function buildDefaultStarterStep(): ?array {
+        $candidates = $this->templateManager->getBestTemplateCandidatesForCapability('shell.glue', [
+            'scriptRuntime' => 'sh',
+            'requiresScriptInput' => true,
+        ]);
+
+        foreach ($candidates as $template) {
+            $scriptInput = $this->templateScriptInputName($template);
+            if ($scriptInput === null) {
+                continue;
+            }
+
+            return [
+                'id' => 'step-1',
+                'templateId' => trim((string)($template['id'] ?? '')),
+                'target' => 'inherit',
+                'dependsOn' => [],
+                'onFailure' => 'stop',
+                'inputs' => [$scriptInput => 'echo "Hello from Workflows Studio"'],
+                'secrets' => [],
+            ];
+        }
+
+        return null;
     }
 
     private function normalizeSteps(array $steps): array {
@@ -562,11 +589,54 @@ class WorkflowStudioManager {
                     ? strtolower(trim((string)($step['onFailure'] ?? 'stop')))
                     : 'stop',
                 'inputs' => is_array($step['inputs'] ?? null) ? $step['inputs'] : [],
-                'secrets' => is_array($step['secrets'] ?? null) ? $step['secrets'] : [],
+                'secrets' => $this->normalizeSecretsMap($step['secrets'] ?? []),
             ];
         }
 
         return $normalized === [] ? $this->buildDefaultDraft()['steps'] : $normalized;
+    }
+
+    private function normalizeSecretsMap($value): array {
+        if (!is_array($value) || $value === []) {
+            return [];
+        }
+
+        if ($this->isAssocArray($value)) {
+            $normalized = [];
+            foreach ($value as $envVar => $secretId) {
+                $envVar = trim((string)$envVar);
+                $secretId = trim((string)$secretId);
+                if ($envVar === '' || $secretId === '') {
+                    continue;
+                }
+                $normalized[$envVar] = $secretId;
+            }
+            return $normalized;
+        }
+
+        $normalized = [];
+        foreach ($value as $entry) {
+            if (is_string($entry)) {
+                $entry = trim($entry);
+                if ($entry !== '') {
+                    $normalized[$entry] = $entry;
+                }
+                continue;
+            }
+
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $envVar = trim((string)($entry['envVar'] ?? $entry['env'] ?? $entry['name'] ?? $entry['key'] ?? ''));
+            $secretId = trim((string)($entry['secretId'] ?? $entry['secret'] ?? $entry['value'] ?? ''));
+            if ($envVar === '' || $secretId === '') {
+                continue;
+            }
+            $normalized[$envVar] = $secretId;
+        }
+
+        return $normalized;
     }
 
     private function normalizeTargetRef($targetRef) {
@@ -833,9 +903,12 @@ class WorkflowStudioManager {
             $templateId = trim((string)($step['templateId'] ?? ''));
             $template = is_array($templatesById[$templateId] ?? null) ? $templatesById[$templateId] : null;
             $commandScript = $this->extractShellExecCommand($step, $template);
+            $transformScript = $this->extractTransformScript($step, $template);
 
-            if ($templateId === 'shell-exec' && $commandScript !== null) {
+            if ($commandScript !== null) {
                 $stepErrors = $this->lintShellExecToolUsage($commandScript, $label, $template);
+                $errors = array_merge($errors, $stepErrors);
+                $stepErrors = $this->lintShellExecInterpolatedPayloadUsage($step, $commandScript, $stepById, $templatesById, $label);
                 $errors = array_merge($errors, $stepErrors);
 
                 $writes = $this->extractScriptFileWrites($commandScript);
@@ -846,6 +919,17 @@ class WorkflowStudioManager {
                 if ($reads !== []) {
                     $fileReadsByStep[$stepId] = $reads;
                 }
+            }
+
+            if ($transformScript !== null) {
+                $stepErrors = $this->lintTransformScriptInterpolationUsage($step, $transformScript, $label, $template);
+                $errors = array_merge($errors, $stepErrors);
+                $stepErrors = $this->lintTransformParsedPayloadModeUsage($transformScript, $label, $template);
+                $errors = array_merge($errors, $stepErrors);
+                $stepErrors = $this->lintTransformReservedPayloadIdentifierUsage($transformScript, $label, $template);
+                $errors = array_merge($errors, $stepErrors);
+                $stepErrors = $this->lintTransformScriptHttpUsage($transformScript, $label, $template);
+                $errors = array_merge($errors, $stepErrors);
             }
 
             $httpErrors = $this->lintHttpStepUsage($step, $stepById, $templatesById, $label);
@@ -879,16 +963,124 @@ class WorkflowStudioManager {
         return ['errors' => $errors, 'warnings' => $warnings];
     }
 
+    private function lintWorkflowInputUsage(array $draft): array {
+        $errors = [];
+        $warnings = [];
+        $referencedInputNames = [];
+
+        $declaredInputs = [];
+        foreach ((array)($draft['inputContract'] ?? []) as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+            $name = trim((string)($field['name'] ?? ''));
+            if ($name !== '') {
+                $declaredInputs[$name] = $field;
+            }
+        }
+
+        $defaultInputs = is_array($draft['inputs'] ?? null) ? $draft['inputs'] : [];
+        $references = $this->collectInterpolationReferences((array)($draft['steps'] ?? []));
+
+        foreach ($references as $ref) {
+            if (!str_starts_with($ref, 'inputs.')) {
+                continue;
+            }
+
+            $parts = array_values(array_filter(
+                array_map(static fn($part): string => trim((string)$part), explode('.', $ref)),
+                static fn(string $part): bool => $part !== ''
+            ));
+
+            if (count($parts) !== 2) {
+                $errors[] = sprintf(
+                    'Workflow input reference `%s` is invalid. Use the form `inputs.<name>` only.',
+                    $ref
+                );
+                continue;
+            }
+
+            $inputName = $parts[1];
+            $referencedInputNames[$inputName] = true;
+            $isDeclared = array_key_exists($inputName, $declaredInputs);
+            $hasDefault = array_key_exists($inputName, $defaultInputs);
+            $defaultValue = $defaultInputs[$inputName] ?? null;
+            $hasUsableDefault = $this->hasUsableWorkflowDefault($defaultValue);
+
+            if (!$isDeclared && !$hasDefault) {
+                $errors[] = sprintf(
+                    'Workflow references `inputs.%s`, but that input is neither declared in `inputContract` nor given a default in `inputs`.',
+                    $inputName
+                );
+                continue;
+            }
+
+            if (!$isDeclared && !$hasUsableDefault) {
+                $errors[] = sprintf(
+                    'Workflow references `inputs.%s`, but that input is not exposed in `inputContract` and its default value is empty. Expose it to the operator or provide a real non-empty default.',
+                    $inputName
+                );
+                continue;
+            }
+
+            if (!$isDeclared && $hasUsableDefault) {
+                $warnings[] = sprintf(
+                    'Workflow uses hidden input `inputs.%s` with an internal default. Prefer exposing operator-provided values in `inputContract` unless the input is intentionally internal.',
+                    $inputName
+                );
+            }
+        }
+
+        foreach ($declaredInputs as $inputName => $field) {
+            if (isset($referencedInputNames[$inputName])) {
+                continue;
+            }
+
+            $warnings[] = sprintf(
+                'Workflow declares input `%s` in `inputContract`, but no step currently references `inputs.%s`. Remove unused operator inputs instead of reserving them for future steps or unfinished features.',
+                $inputName,
+                $inputName
+            );
+        }
+
+        return ['errors' => array_values(array_unique($errors)), 'warnings' => array_values(array_unique($warnings))];
+    }
+
     private function lintHttpStepUsage(array $step, array $stepById, array $templatesById, string $label): array {
         $templateId = trim((string)($step['templateId'] ?? ''));
-        if (!in_array($templateId, ['http-request', 'http-api'], true)) {
+        $template = is_array($templatesById[$templateId] ?? null) ? $templatesById[$templateId] : null;
+        if (!$this->templateSupportsCapability($template, 'http.fetch')) {
             return [];
         }
 
         $inputs = is_array($step['inputs'] ?? null) ? $step['inputs'] : [];
-        $pathValue = trim((string)($inputs['path'] ?? ''));
+        $pathInput = $this->templateRequestPathInputName($template) ?? 'path';
+        $headersInput = $this->templateRequestHeadersInputName($template) ?? 'headers';
+        $pathValue = trim((string)($inputs[$pathInput] ?? ''));
+        $headersValue = trim((string)($inputs[$headersInput] ?? ''));
+        if ($this->templateExpectsPlainHeaders($template) && $headersValue !== '' && preg_match('/^\s*\{.*\}\s*$/s', $headersValue) === 1) {
+            $headerExample = $this->convertJsonHeaderStringToPlainText($headersValue);
+            return [
+                sprintf(
+                    '%s sets `%s` as a JSON object string, but template `%s` expects plain text headers like `Header1:Value1,Header2:Value2`. Put auth secrets in inputs or targets, and only use `%s` for extra literal headers.%s',
+                    $label
+                    ,
+                    $headersInput,
+                    $templateId
+                    ,
+                    $headersInput,
+                    $headerExample !== null ? ' Equivalent plain-text value: `' . $headerExample . '`.' : ''
+                ),
+            ];
+        }
+
         if ($pathValue === '') {
             return [];
+        }
+
+        $rawPathErrors = $this->lintHttpPathInterpolationUsage($pathValue, $stepById, $templatesById, $label, $pathInput);
+        if ($rawPathErrors !== []) {
+            return array_merge($rawPathErrors, []);
         }
 
         if (preg_match('/^\s*\{\{(steps\.[a-zA-Z0-9_.-]+)\}\}\s*$/', $pathValue, $matches) !== 1) {
@@ -914,13 +1106,81 @@ class WorkflowStudioManager {
             return [];
         }
 
+        $jsonExtractGuidance = $this->capabilityRecommendationText(
+            'json.extract',
+            ['payloadHandling' => ['structured-json']],
+            2
+        );
+
         return [
             sprintf(
-                '%s uses `%s` as the HTTP path, but step `%s` returns a JSON response body, not a URL. Extract the URL first, for example with `steps.%s.extract.responseBody` plus template `json-field`, or another step that outputs a plain URL string.',
+                '%s uses `%s` as the HTTP path, but step `%s` returns a JSON response body, not a URL. Extract the URL first, for example with `steps.%s.extract.responseBody` plus an installed JSON-extraction template, or another step that outputs a plain URL string.%s',
                 $label,
                 $ref,
                 $referencedStepId,
-                $referencedStepId
+                $referencedStepId,
+                $jsonExtractGuidance
+            ),
+        ];
+    }
+
+    private function lintHttpPathInterpolationUsage(
+        string $pathValue,
+        array $stepById,
+        array $templatesById,
+        string $label,
+        string $pathInput
+    ): array {
+        $rawPayloadRefs = [];
+
+        foreach ($this->collectInterpolationReferences($pathValue) as $ref) {
+            if (!preg_match('/^steps\.([a-zA-Z0-9_-]+)\.(output|extract\.responseBody)$/', $ref, $matches)) {
+                continue;
+            }
+
+            $referencedStepId = trim((string)($matches[1] ?? ''));
+            if ($referencedStepId === '' || !isset($stepById[$referencedStepId])) {
+                continue;
+            }
+
+            $referencedStep = is_array($stepById[$referencedStepId] ?? null) ? $stepById[$referencedStepId] : [];
+            $referencedTemplateId = trim((string)($referencedStep['templateId'] ?? ''));
+            $referencedTemplate = is_array($templatesById[$referencedTemplateId] ?? null) ? $templatesById[$referencedTemplateId] : null;
+            $refKind = trim((string)($matches[2] ?? ''));
+            $isRawResponseBody = $refKind === 'extract.responseBody';
+
+            $looksStructured = $isRawResponseBody
+                || trim((string)($referencedTemplate['output']['type'] ?? '')) === 'json'
+                || $this->stepLikelyOutputsStructuredText($referencedStep, $referencedTemplate);
+
+            if ($looksStructured) {
+                $rawPayloadRefs[] = $ref;
+            }
+        }
+
+        if ($rawPayloadRefs === []) {
+            return [];
+        }
+
+        $rawPayloadRefs = array_values(array_unique($rawPayloadRefs));
+        $jsonExtractGuidance = $this->capabilityRecommendationBundle([
+            ['capability' => 'json.extract', 'context' => ['payloadHandling' => ['structured-json']]],
+            ['capability' => 'json.count', 'context' => ['payloadHandling' => ['structured-json']]],
+        ], 1);
+        $payloadTransformGuidance = $this->capabilityRecommendationText(
+            'payload.transform',
+            ['payloadHandling' => ['structured-json', 'large-text'], 'requiresScriptInput' => true, 'requiresPayloadInputs' => true],
+            1
+        );
+
+        return [
+            sprintf(
+                '%s interpolates raw payload %s into HTTP path input `%s`. An HTTP fetch step needs one scalar URL or path, not a full JSON/text payload. Extract the exact scalar first, or use a transform-capable template to produce one plain URL/query value before this step.%s%s',
+                $label,
+                count($rawPayloadRefs) === 1 ? 'reference `' . $rawPayloadRefs[0] . '`' : 'references ' . $this->formatQuotedList($rawPayloadRefs),
+                $pathInput,
+                $jsonExtractGuidance,
+                $payloadTransformGuidance
             ),
         ];
     }
@@ -1043,17 +1303,165 @@ class WorkflowStudioManager {
     }
 
     private function extractShellExecCommand(array $step, ?array $template): ?string {
-        $templateId = trim((string)($step['templateId'] ?? ''));
-        if ($templateId !== 'shell-exec') {
+        if (!$this->templateSupportsCapability($template, 'shell.glue')) {
+            return null;
+        }
+        $scriptInput = $this->templateScriptInputName($template);
+        if ($scriptInput === null) {
             return null;
         }
         $inputs = is_array($step['inputs'] ?? null) ? $step['inputs'] : [];
-        $command = $inputs['command'] ?? null;
+        $command = $inputs[$scriptInput] ?? null;
         if (!is_string($command)) {
             return null;
         }
         $command = trim($command);
         return $command !== '' ? $command : null;
+    }
+
+    private function extractTransformScript(array $step, ?array $template): ?string {
+        if (!$this->templateSupportsCapability($template, 'payload.transform')) {
+            return null;
+        }
+        $scriptInput = $this->templateScriptInputName($template);
+        if ($scriptInput === null || $this->templateInputType($template, $scriptInput) !== 'string') {
+            return null;
+        }
+        $inputs = is_array($step['inputs'] ?? null) ? $step['inputs'] : [];
+        $script = $inputs[$scriptInput] ?? null;
+        if (!is_string($script)) {
+            return null;
+        }
+        $script = trim($script);
+        return $script !== '' ? $script : null;
+    }
+
+    private function lintTransformScriptInterpolationUsage(array $step, string $script, string $label, ?array $template): array {
+        $references = array_values(array_unique(array_filter(
+            $this->collectInterpolationReferences($script),
+            static fn(string $ref): bool => str_starts_with($ref, 'inputs.') || str_starts_with($ref, 'steps.')
+        )));
+
+        if ($references === []) {
+            return [];
+        }
+
+        $payloadInputs = $this->listTemplatePayloadInputs($template);
+        $payloadLabel = $payloadInputs !== []
+            ? ' dedicated payload inputs like ' . $this->formatQuotedList($payloadInputs)
+            : ' dedicated non-script template inputs';
+        $runtimeHint = $this->templateScriptRuntime($template) === 'python'
+            ? ' Interpolated values are inserted as raw text and often break Python syntax or JSON parsing.'
+            : '';
+
+        return [
+            sprintf(
+                '%s embeds workflow placeholder %s directly into a transform script. Keep transform scripts static and pass dynamic workflow data through%s instead, then read it from the script runtime.%s',
+                $label,
+                count($references) === 1 ? '`' . $references[0] . '`' : $this->formatQuotedList($references),
+                $payloadLabel,
+                $runtimeHint
+            ),
+        ];
+    }
+
+    private function lintTransformParsedPayloadModeUsage(string $script, string $label, ?array $template): array {
+        if ($this->templatePayloadValueMode($template) !== 'parsed-json-or-raw') {
+            return [];
+        }
+
+        $payloadInputs = $this->listTemplatePayloadInputs($template);
+        if ($payloadInputs === []) {
+            return [];
+        }
+
+        $errors = [];
+        $rawSuffix = $this->templatePayloadRawSuffix($template) ?? '_raw';
+
+        foreach ($payloadInputs as $payloadInput) {
+            $pattern = '/json\.loads\(\s*' . preg_quote($payloadInput, '/') . '\b/s';
+            if (preg_match($pattern, $script) !== 1) {
+                continue;
+            }
+
+            $errors[] = sprintf(
+                '%s calls `json.loads(%s)` even though `%s` is already parsed when the payload contains valid JSON. Use `%s` directly for parsed data, or use `%s%s` if you truly need the original raw string.',
+                $label,
+                $payloadInput,
+                $payloadInput,
+                $payloadInput,
+                $payloadInput,
+                $rawSuffix
+            );
+        }
+
+        return $errors;
+    }
+
+    private function lintTransformReservedPayloadIdentifierUsage(string $script, string $label, ?array $template): array {
+        $payloadInputs = $this->listTemplatePayloadInputs($template);
+        if ($payloadInputs === []) {
+            return [];
+        }
+
+        $prefix = $this->detectNumberedPayloadPrefix($payloadInputs);
+        if ($prefix === null) {
+            return [];
+        }
+
+        $rawSuffix = $this->templatePayloadRawSuffix($template) ?? '_raw';
+        $allowed = [];
+        foreach ($payloadInputs as $payloadInput) {
+            $allowed[$payloadInput] = true;
+            $allowed[$payloadInput . $rawSuffix] = true;
+        }
+
+        if (preg_match_all('/\b(' . preg_quote($prefix, '/') . '\d+(?:' . preg_quote($rawSuffix, '/') . ')?)\b/', $script, $matches) < 1) {
+            return [];
+        }
+
+        $unknown = [];
+        foreach (($matches[1] ?? []) as $identifier) {
+            $identifier = trim((string)$identifier);
+            if ($identifier === '' || isset($allowed[$identifier])) {
+                continue;
+            }
+            $unknown[$identifier] = true;
+        }
+
+        if ($unknown === []) {
+            return [];
+        }
+
+        return [
+            sprintf(
+                '%s references undeclared transform runtime value %s. This template only exposes %s%s. If you need more payload slots, use a different template or reshape the workflow first.',
+                $label,
+                count($unknown) === 1 ? '`' . array_key_first($unknown) . '`' : $this->formatQuotedList(array_keys($unknown)),
+                $this->formatQuotedList($payloadInputs),
+                $rawSuffix !== '' ? ' plus the matching raw variants with suffix `' . $rawSuffix . '`' : ''
+            ),
+        ];
+    }
+
+    private function lintTransformScriptHttpUsage(string $script, string $label, ?array $template): array {
+        if (!$this->scriptLooksLikeHttpUsage($script)) {
+            return [];
+        }
+
+        $httpFetchGuidance = $this->capabilityRecommendationText(
+            'http.fetch',
+            [],
+            2
+        );
+
+        return [
+            sprintf(
+                '%s performs HTTP or API calls inside a transform script. Keep transform-capable templates for sorting, filtering, joining, or reshaping already-fetched payloads. Fetch each external response in dedicated HTTP steps first, then pass those results into the transform step via payload inputs.%s',
+                $label,
+                $httpFetchGuidance
+            ),
+        ];
     }
 
     private function lintShellExecToolUsage(string $script, string $label, ?array $template): array {
@@ -1062,6 +1470,8 @@ class WorkflowStudioManager {
             static fn($item): string => strtolower(trim((string)$item)),
             is_array($template['requirements'] ?? null) ? $template['requirements'] : []
         );
+        $templateId = trim((string)($template['id'] ?? ''));
+        $templateLabel = $templateId !== '' ? 'template `' . $templateId . '`' : 'the selected shell-glue template';
         $looksLikeHttpWorkflow = preg_match('/https?:\/\//i', $script) === 1
             || preg_match('/\b(curl|wget)\b/i', $script) === 1
             || str_contains($script, 'HTTP_ENDPOINT');
@@ -1095,16 +1505,35 @@ class WorkflowStudioManager {
             $suggestion = '';
             $parsesResponseBody = str_contains($script, '.extract.responseBody');
             if (in_array($tool, ['curl', 'wget'], true) && $looksLikeHttpWorkflow) {
-                $suggestion = ' For external APIs, prefer template `http-request` or `http-api` instead of generic `shell-exec`.';
-            } elseif (in_array($tool, ['python3', 'python', 'jq'], true) && $parsesResponseBody) {
-                $suggestion = ' This step appears to parse prior HTTP JSON responses. Prefer separate `json-field` steps for each needed scalar, `json-count` for array totals, then keep the final `shell-exec` step to plain `echo` or `printf`.';
+                $suggestion = ' For external APIs, prefer an installed HTTP-fetch template instead of generic shell glue.' .
+                    $this->capabilityRecommendationText('http.fetch', [], 2);
+            } elseif (in_array($tool, ['python3', 'python'], true) && ($parsesResponseBody || str_contains($script, '{{steps.'))) {
+                $suggestion = ' This step appears to process upstream workflow payloads in script logic. Prefer an installed transform-capable template for that logic, and only keep shell glue for small orchestration or formatting.' .
+                    $this->capabilityRecommendationText(
+                        'payload.transform',
+                        ['payloadHandling' => ['structured-json', 'large-text'], 'requiresScriptInput' => true, 'requiresPayloadInputs' => true],
+                        2
+                    );
+            } elseif (in_array($tool, ['jq'], true) && $parsesResponseBody) {
+                $suggestion = ' This step appears to parse prior HTTP JSON responses. Prefer installed JSON-extraction or JSON-counting templates for the scalar work, then keep the final formatting step small.' .
+                    $this->capabilityRecommendationBundle([
+                        ['capability' => 'json.extract', 'context' => ['payloadHandling' => ['structured-json']]],
+                        ['capability' => 'json.count', 'context' => ['payloadHandling' => ['structured-json']]],
+                        ['capability' => 'text.format', 'context' => ['requiresScriptInput' => true]],
+                    ], 1);
             } elseif (in_array($tool, ['python3', 'python', 'jq'], true)) {
-                $suggestion = ' If this step must parse JSON, either install the parser in the same script or prefer template `json-field` / `json-count`, or use a template extractor and reference `steps.<id>.extract.<name>` later.';
+                $suggestion = ' If this step must parse JSON, either install the parser in the same script or use installed transform, JSON-extraction, or JSON-counting templates, or use a template extractor and reference `steps.<id>.extract.<name>` later.' .
+                    $this->capabilityRecommendationBundle([
+                        ['capability' => 'payload.transform', 'context' => ['requiresScriptInput' => true, 'requiresPayloadInputs' => true]],
+                        ['capability' => 'json.extract', 'context' => ['payloadHandling' => ['structured-json']]],
+                        ['capability' => 'json.count', 'context' => ['payloadHandling' => ['structured-json']]],
+                    ], 1);
             }
             $errors[] = sprintf(
-                '%s uses `%s`, but template `shell-exec` only guarantees %s. Use a template/runtime that provides `%s`, or install it explicitly inside the same step.%s',
+                '%s uses `%s`, but %s only guarantees %s. Use a template/runtime that provides `%s`, or install it explicitly inside the same step.%s',
                 $label,
                 $tool,
+                $templateLabel,
                 $requirements !== [] ? $this->formatQuotedList($requirements) : '`sh`',
                 $tool,
                 $suggestion
@@ -1112,6 +1541,396 @@ class WorkflowStudioManager {
         }
 
         return $errors;
+    }
+
+    private function lintShellExecInterpolatedPayloadUsage(
+        array $step,
+        string $script,
+        array $stepById,
+        array $templatesById,
+        string $label
+    ): array {
+        $errors = [];
+        $rawPayloadRefs = [];
+
+        foreach ($this->collectInterpolationReferences($script) as $ref) {
+            if (!preg_match('/^steps\.([a-zA-Z0-9_-]+)\.(output|extract\.responseBody)$/', $ref, $matches)) {
+                continue;
+            }
+
+            $referencedStepId = trim((string)($matches[1] ?? ''));
+            if ($referencedStepId === '' || !isset($stepById[$referencedStepId])) {
+                continue;
+            }
+
+            $referencedStep = is_array($stepById[$referencedStepId] ?? null) ? $stepById[$referencedStepId] : [];
+            $referencedTemplateId = trim((string)($referencedStep['templateId'] ?? ''));
+            $referencedTemplate = is_array($templatesById[$referencedTemplateId] ?? null) ? $templatesById[$referencedTemplateId] : null;
+            $extractorRef = ($matches[2] ?? '') === 'extract.responseBody';
+
+            $isLikelyLargePayload = $extractorRef
+                || $this->templateSupportsCapability($referencedTemplate, 'shell.glue')
+                || $this->templateSupportsCapability($referencedTemplate, 'http.fetch')
+                || trim((string)($referencedTemplate['output']['type'] ?? '')) === 'json';
+
+            if ($isLikelyLargePayload) {
+                $rawPayloadRefs[] = $ref;
+            }
+        }
+
+        if ($rawPayloadRefs === []) {
+            return [];
+        }
+
+        $references = array_values(array_unique($rawPayloadRefs));
+        $payloadTransformGuidance = $this->capabilityRecommendationText(
+            'payload.transform',
+            ['payloadHandling' => ['structured-json', 'large-text'], 'requiresScriptInput' => true, 'requiresPayloadInputs' => true],
+            2
+        );
+        $jsonScalarGuidance = $this->capabilityRecommendationBundle([
+            ['capability' => 'json.extract', 'context' => ['payloadHandling' => ['structured-json']]],
+            ['capability' => 'json.count', 'context' => ['payloadHandling' => ['structured-json']]],
+        ], 1);
+        $errors[] = sprintf(
+            '%s inlines raw payload %s into a shell-glue command. That often exceeds the shell command length limit and makes the workflow brittle. Extract only the scalar values you need first with installed JSON-extraction or counting templates, or move the payload processing into an installed transform-capable template using payload inputs, then keep the shell step to small formatting or orchestration logic.%s%s',
+            $label,
+            count($references) === 1 ? 'reference `' . $references[0] . '`' : 'references ' . $this->formatQuotedList($references),
+            $jsonScalarGuidance,
+            $payloadTransformGuidance
+        );
+
+        return $errors;
+    }
+
+    private function templateSupportsCapability(?array $template, string $capability): bool {
+        if (!is_array($template)) {
+            return false;
+        }
+
+        $hints = is_array($template['capabilityHints'] ?? null) ? $template['capabilityHints'] : [];
+        $capabilities = is_array($hints['capabilities'] ?? null) ? $hints['capabilities'] : [];
+
+        return in_array($capability, $capabilities, true);
+    }
+
+    private function capabilityRecommendationText(string $capability, array $context = [], int $limit = 2): string {
+        $candidates = $this->templateManager->getBestTemplateCandidatesForCapability($capability, $context);
+        $ids = array_map(
+            static fn(array $template): string => trim((string)($template['id'] ?? '')),
+            array_slice($candidates, 0, max(1, $limit))
+        );
+        $ids = array_values(array_filter($ids));
+
+        if ($ids === []) {
+            return ' No installed template currently advertises `' . $capability . '`.';
+        }
+
+        return ' Installed candidates: `' . implode('`, `', $ids) . '`.';
+    }
+
+    private function capabilityRecommendationBundle(array $requests, int $limit = 1): string {
+        $parts = [];
+
+        foreach ($requests as $request) {
+            if (!is_array($request)) {
+                continue;
+            }
+
+            $capability = trim((string)($request['capability'] ?? ''));
+            if ($capability === '') {
+                continue;
+            }
+
+            $context = is_array($request['context'] ?? null) ? $request['context'] : [];
+            $candidates = $this->templateManager->getBestTemplateCandidatesForCapability($capability, $context);
+            $ids = array_map(
+                static fn(array $template): string => trim((string)($template['id'] ?? '')),
+                array_slice($candidates, 0, max(1, $limit))
+            );
+            $ids = array_values(array_filter($ids));
+
+            $parts[] = $ids === []
+                ? '`' . $capability . '` has no installed match'
+                : '`' . $capability . '` -> `' . implode('`, `', $ids) . '`';
+        }
+
+        if ($parts === []) {
+            return '';
+        }
+
+        return ' Candidates: ' . implode('; ', $parts) . '.';
+    }
+
+    private function extractCapabilityGaps(array $errors, array $warnings): array {
+        $messages = array_merge($errors, $warnings);
+        $gaps = [];
+        $seen = [];
+
+        foreach ($messages as $message) {
+            if (!is_string($message) || trim($message) === '') {
+                continue;
+            }
+
+            foreach ($this->extractCapabilityNamesFromMessage($message) as $capability) {
+                if (isset($seen[$capability])) {
+                    continue;
+                }
+
+                $seen[$capability] = true;
+                $gaps[] = [
+                    'capability' => $capability,
+                    'label' => $this->formatCapabilityLabel($capability),
+                    'summary' => sprintf(
+                        'This workflow needs `%s`, but no installed template currently advertises that capability.',
+                        $capability
+                    ),
+                ];
+            }
+        }
+
+        return $gaps;
+    }
+
+    private function extractCapabilityNamesFromMessage(string $message): array {
+        $patterns = [
+            '/No installed template currently advertises `([^`]+)`\./',
+            '/`([^`]+)` has no installed match/',
+        ];
+        $capabilities = [];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match_all($pattern, $message, $matches) < 1) {
+                continue;
+            }
+
+            foreach (($matches[1] ?? []) as $capability) {
+                $capability = trim((string)$capability);
+                if ($capability !== '') {
+                    $capabilities[] = $capability;
+                }
+            }
+        }
+
+        return array_values(array_unique($capabilities));
+    }
+
+    private function formatCapabilityLabel(string $capability): string {
+        $parts = array_values(array_filter(
+            array_map(
+                static fn(string $part): string => trim(str_replace(['-', '_'], ' ', $part)),
+                explode('.', strtolower(trim($capability)))
+            ),
+            static fn(string $part): bool => $part !== ''
+        ));
+
+        if ($parts === []) {
+            return 'Capability';
+        }
+
+        return implode(' / ', array_map(
+            static fn(string $part): string => ucwords($part),
+            $parts
+        ));
+    }
+
+    private function templateScriptInputName(?array $template): ?string {
+        if (!is_array($template)) {
+            return null;
+        }
+
+        $scriptInput = trim((string)($template['capabilityHints']['dataFlow']['scriptInput'] ?? ''));
+        if ($scriptInput === '') {
+            return null;
+        }
+
+        return $scriptInput;
+    }
+
+    private function templateScriptRuntime(?array $template): ?string {
+        if (!is_array($template)) {
+            return null;
+        }
+
+        $runtime = trim((string)($template['capabilityHints']['scriptRuntime'] ?? ''));
+        return $runtime !== '' ? $runtime : null;
+    }
+
+    private function templatePayloadValueMode(?array $template): ?string {
+        if (!is_array($template)) {
+            return null;
+        }
+
+        $mode = trim((string)($template['capabilityHints']['dataFlow']['payloadValueMode'] ?? ''));
+        return $mode !== '' ? $mode : null;
+    }
+
+    private function templatePayloadRawSuffix(?array $template): ?string {
+        if (!is_array($template)) {
+            return null;
+        }
+
+        $suffix = trim((string)($template['capabilityHints']['dataFlow']['payloadRawSuffix'] ?? ''));
+        return $suffix !== '' ? $suffix : null;
+    }
+
+    private function listTemplatePayloadInputs(?array $template): array {
+        if (!is_array($template)) {
+            return [];
+        }
+
+        $inputs = array_map(
+            static fn($value): string => trim((string)$value),
+            (array)($template['capabilityHints']['dataFlow']['payloadInputs'] ?? [])
+        );
+
+        return array_values(array_filter($inputs, static fn(string $value): bool => $value !== ''));
+    }
+
+    private function templateExpectsPlainHeaders(?array $template): bool {
+        $headersInput = $this->templateRequestHeadersInputName($template) ?? 'headers';
+        $type = $this->templateInputType($template, $headersInput);
+        return in_array($type, ['string', 'text'], true);
+    }
+
+    private function templateRequestPathInputName(?array $template): ?string {
+        if (!is_array($template)) {
+            return null;
+        }
+
+        $input = trim((string)($template['capabilityHints']['dataFlow']['requestPathInput'] ?? ''));
+        return $input !== '' ? $input : null;
+    }
+
+    private function templateRequestHeadersInputName(?array $template): ?string {
+        if (!is_array($template)) {
+            return null;
+        }
+
+        $input = trim((string)($template['capabilityHints']['dataFlow']['requestHeadersInput'] ?? ''));
+        return $input !== '' ? $input : null;
+    }
+
+    private function stepLikelyOutputsStructuredText(array $step, ?array $template): bool {
+        if ($this->templateSupportsCapability($template, 'payload.transform')) {
+            $script = $this->extractTransformScript($step, $template);
+            if (is_string($script) && preg_match('/json\.dumps\s*\(/', $script) === 1) {
+                return true;
+            }
+        }
+
+        $scriptInput = $this->templateScriptInputName($template);
+        if ($scriptInput !== null) {
+            $inputs = is_array($step['inputs'] ?? null) ? $step['inputs'] : [];
+            $script = $inputs[$scriptInput] ?? null;
+            if (is_string($script) && preg_match('/json\.dumps\s*\(/', $script) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function templateInputType(?array $template, string $inputName): ?string {
+        if (!is_array($template)) {
+            return null;
+        }
+
+        foreach ((array)($template['inputs'] ?? []) as $input) {
+            if (!is_array($input)) {
+                continue;
+            }
+
+            if (trim((string)($input['name'] ?? '')) !== $inputName) {
+                continue;
+            }
+
+            $type = strtolower(trim((string)($input['type'] ?? 'string')));
+            return $type !== '' ? $type : 'string';
+        }
+
+        return null;
+    }
+
+    private function scriptLooksLikeHttpUsage(string $script): bool {
+        $patterns = [
+            '/\burllib\.request\b/',
+            '/\bfetch\s*\(/',
+            '/\baxios\b/',
+            '/\bhttpx\b/',
+            '/\brequests?\b/',
+            '/\burlopen\s*\(/',
+            '/\bXMLHttpRequest\b/',
+            '/\bcurl\b/',
+            '/\bwget\b/',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $script) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function convertJsonHeaderStringToPlainText(string $headersValue): ?string {
+        $decoded = json_decode($headersValue, true);
+        if (!is_array($decoded) || array_keys($decoded) === range(0, count($decoded) - 1)) {
+            return null;
+        }
+
+        $parts = [];
+        foreach ($decoded as $key => $value) {
+            $headerName = trim((string)$key);
+            if ($headerName === '') {
+                continue;
+            }
+            if (is_array($value) || is_object($value)) {
+                return null;
+            }
+            $parts[] = $headerName . ':' . trim((string)$value);
+        }
+
+        return $parts !== [] ? implode(',', $parts) : null;
+    }
+
+    private function hasUsableWorkflowDefault($value): bool {
+        if (is_string($value)) {
+            return trim($value) !== '';
+        }
+
+        if (is_array($value)) {
+            return $value !== [];
+        }
+
+        return $value !== null;
+    }
+
+    private function detectNumberedPayloadPrefix(array $payloadInputs): ?string {
+        $prefix = null;
+
+        foreach ($payloadInputs as $payloadInput) {
+            if (!preg_match('/^([A-Za-z_]+)\d+$/', trim((string)$payloadInput), $matches)) {
+                return null;
+            }
+
+            $currentPrefix = trim((string)($matches[1] ?? ''));
+            if ($currentPrefix === '') {
+                return null;
+            }
+
+            if ($prefix === null) {
+                $prefix = $currentPrefix;
+                continue;
+            }
+
+            if ($prefix !== $currentPrefix) {
+                return null;
+            }
+        }
+
+        return $prefix;
     }
 
     private function scriptInstallsTool(string $script, string $tool): bool {
