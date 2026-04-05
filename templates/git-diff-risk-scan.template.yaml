@@ -12,6 +12,16 @@ description: Scan a local git diff for risky file categories like schema, auth, 
 icon: fas fa-triangle-exclamation
 color: "#D97706"
 
+capabilityHints:
+  capabilities:
+    - repo.analyze
+    - repo.diff-risk
+    - text.format
+  payloadHandling:
+    - scalar-only
+    - small-text
+  scriptRuntime: sh
+
 runtime:
   image: alpine/git:2.47.2
   workdir: /workspace/repo

@@ -13,6 +13,13 @@ description: Count items in a JSON array or nested collection
 icon: fas fa-list-ol
 color: "#0EA5A6"
 
+capabilityHints:
+  capabilities:
+    - json.count
+  payloadHandling:
+    - structured-json
+  scriptRuntime: python
+
 # ============================================================================
 # RUNTIME
 # ============================================================================

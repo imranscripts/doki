@@ -12,6 +12,15 @@ description: Fetch the latest GitHub Actions run for a repository or branch and 
 icon: fab fa-github
 color: "#2563EB"
 
+capabilityHints:
+  capabilities:
+    - ci.inspect
+    - repo.analyze
+  payloadHandling:
+    - scalar-only
+    - small-text
+  scriptRuntime: python
+
 runtime:
   image: python:3.12-alpine
   network: host

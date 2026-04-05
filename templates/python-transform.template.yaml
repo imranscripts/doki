@@ -1,0 +1,138 @@
+# ============================================================================
+# PYTHON TRANSFORM TEMPLATE
+# ============================================================================
+# Run a Python script against structured or raw text payload inputs.
+# Useful when a workflow needs to reshape, filter, sort, or join larger JSON
+# payloads without inlining those payloads into a shell command.
+# ============================================================================
+
+id: python-transform
+name: Python Transform
+version: "1.0.0"
+description: Transform JSON or text payloads with Python
+
+icon: fas fa-code
+color: "#3776AB"
+
+capabilityHints:
+  capabilities:
+    - payload.transform
+  payloadHandling:
+    - structured-json
+    - large-text
+  scriptRuntime: python
+  dataFlow:
+    scriptInput: script
+    payloadInputs:
+      - payload1
+      - payload2
+      - payload3
+      - payload4
+    payloadValueMode: parsed-json-or-raw
+    payloadRawSuffix: _raw
+
+# ============================================================================
+# RUNTIME
+# ============================================================================
+runtime:
+  image: python:3.12-alpine
+
+# ============================================================================
+# INPUTS
+# ============================================================================
+inputs:
+  - name: script
+    label: Python Script
+    type: string
+    required: true
+    description: Python code to execute
+    validation:
+      maxLength: 16000
+
+  - name: payload1
+    label: Payload 1
+    type: string
+    required: false
+    description: Optional raw text or JSON payload
+
+  - name: payload2
+    label: Payload 2
+    type: string
+    required: false
+    description: Optional second raw text or JSON payload
+
+  - name: payload3
+    label: Payload 3
+    type: string
+    required: false
+    description: Optional third raw text or JSON payload
+
+  - name: payload4
+    label: Payload 4
+    type: string
+    required: false
+    description: Optional fourth raw text or JSON payload
+
+# ============================================================================
+# EXECUTION
+# ============================================================================
+execution:
+  script: |
+    #!/bin/sh
+    set -eu
+
+    python3 - <<'PY'
+    import json
+    import os
+    import sys
+
+    script = os.environ.get("INPUT_SCRIPT", "")
+    if script.strip() == "":
+        print("Python script is required", file=sys.stderr)
+        sys.exit(1)
+
+    def parse_payload(raw):
+        if raw == "":
+            return None
+        try:
+            return json.loads(raw)
+        except Exception:
+            return raw
+
+    payload1_raw = os.environ.get("INPUT_PAYLOAD1", "")
+    payload2_raw = os.environ.get("INPUT_PAYLOAD2", "")
+    payload3_raw = os.environ.get("INPUT_PAYLOAD3", "")
+    payload4_raw = os.environ.get("INPUT_PAYLOAD4", "")
+
+    namespace = {
+        "__builtins__": __builtins__,
+        "json": json,
+        "os": os,
+        "sys": sys,
+        "payload1_raw": payload1_raw,
+        "payload2_raw": payload2_raw,
+        "payload3_raw": payload3_raw,
+        "payload4_raw": payload4_raw,
+        "payload1": parse_payload(payload1_raw),
+        "payload2": parse_payload(payload2_raw),
+        "payload3": parse_payload(payload3_raw),
+        "payload4": parse_payload(payload4_raw),
+    }
+
+    exec(compile(script, "<python-transform>", "exec"), namespace, namespace)
+    PY
+
+  mode: sync
+  timeout: 60
+
+# ============================================================================
+# OUTPUT
+# ============================================================================
+output:
+  type: text
+
+# ============================================================================
+# REQUIREMENTS
+# ============================================================================
+requirements:
+  - python3

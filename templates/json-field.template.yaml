@@ -13,6 +13,13 @@ description: Extract a single field from a JSON document
 icon: fas fa-code-branch
 color: "#1E88E5"
 
+capabilityHints:
+  capabilities:
+    - json.extract
+  payloadHandling:
+    - structured-json
+  scriptRuntime: python
+
 # ============================================================================
 # RUNTIME
 # ============================================================================

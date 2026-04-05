@@ -63,12 +63,14 @@ $action = $_GET['action'] ?? '';
 
 switch ($action) {
     case 'list':
+        $runtimeTemplates = $runtimeTemplateManager->getTemplates();
         jsonResponse([
             'success' => true,
             'workflowProjects' => $workflowManager->listProjects(),
             'templateProjects' => $templateStudioManager->listProjects(),
             'workflowDefaults' => $workflowManager->getDefaultDraft(),
             'templateDefaults' => $templateStudioManager->getDefaultDraft(),
+            'runtimeTemplates' => !empty($runtimeTemplates['success']) ? ($runtimeTemplates['templates'] ?? []) : [],
             'stats' => buildStudioStats($commandsManager, $runtimeTemplateManager, $sourcesManager, $aiAdminManager),
         ]);
         break;
@@ -231,9 +233,15 @@ switch ($action) {
         $prompt = trim((string)($input['prompt'] ?? ''));
         $providerId = trim((string)($input['providerId'] ?? ''));
         $currentDraft = is_array($input['currentDraft'] ?? null) ? $input['currentDraft'] : [];
+        $conversation = is_array($input['conversation'] ?? null) ? $input['conversation'] : [];
+        $currentValidation = is_array($input['currentValidation'] ?? null) ? $input['currentValidation'] : [];
+        $editMode = !empty($input['editMode']);
 
         $result = $workflowAiManager->generateDraft($type, $prompt, $providerId, [
             'currentDraft' => $currentDraft,
+            'conversation' => $conversation,
+            'currentValidation' => $currentValidation,
+            'editMode' => $editMode,
         ]);
 
         if (!empty($result['success'])) {

@@ -375,7 +375,7 @@ Workflow structure and authoring:
 - Use step IDs and workflow names that describe the actual operator intent.
 - Add dependencies only where ordering is required, and leave unrelated steps independent so they can run in parallel.
 - Prefer reusable templates for stable repeated logic and keep workflow-specific intent in the workflow itself.
-- Use shell-exec when it is the clearest fit or as thin glue between other steps, not as the default answer to every workflow.
+- Use a shell-glue or text-formatting template only when it is the clearest fit or as thin glue between other steps, not as the default answer to every workflow.
 TEXT,
                 15
             ),
@@ -392,6 +392,7 @@ Template and schema rules:
 - Prefer typed inputs with safe defaults over free-form shell interpolation.
 - Make step intent obvious from names, descriptions, and input labels.
 - Reuse existing template patterns when the execution flow already matches a known shape.
+- Prefer installed templates whose declared capabilities match the job instead of overloading one generic shell step.
 TEXT,
                 20
             ),
@@ -441,10 +442,10 @@ Interpolation and dependency rules:
 - Step inputs can reference earlier step state with placeholders like `{{steps.build.output}}` or `{{steps.build.extract.imageTag}}`.
 - Only `status`, `exitCode`, `error`, `output`, and `extract.<name>` are available from prior steps. Paths like `{{steps.build.name}}` are invalid.
 - `steps.<id>.output` is always raw text. Even if a template reports JSON output, it is still exposed as a string unless the template defines extractors.
-- HTTP templates expose `extract.responseBody` for the raw response body and `extract.statusCode` for the HTTP status code.
+- If an installed HTTP-fetch template exposes `extract.responseBody` or `extract.statusCode`, prefer those extractor fields over reparsing large raw output.
 - Use `inherit` when a step should not force a target. Do not use `none` as a target value.
 - A step should only reference steps it depends on, directly or transitively.
-- In template execution scripts, interpolated step inputs are available directly by their input name, such as `{{command}}` in the shell-exec template.
+- In template execution scripts, interpolated step inputs are available directly by their input name, such as `{{command}}` in a shell-glue step template.
 - Keep references explicit and easy to audit so dry-run previews and history stay understandable.
 TEXT,
                 35
