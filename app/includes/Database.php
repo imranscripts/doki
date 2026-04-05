@@ -9,7 +9,7 @@
 class Database {
     private static ?PDO $instance = null;
     private const DB_PATH = __DIR__ . '/../data/doki.db';
-    private const SCHEMA_VERSION = 15; // Bumped for Workflows Studio draft model
+    private const SCHEMA_VERSION = 17; // Bumped for Workflows Studio AI apply/revert versions
 
     public static function getInstance(): PDO {
         if (self::$instance === null) {
@@ -50,6 +50,7 @@ class Database {
         // Check if schema_version table exists
         $result = $db->query("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'");
         $hasSchema = $result->fetch();
+        $result->closeCursor();
 
         if (!$hasSchema) {
             self::createTables();
@@ -68,63 +69,36 @@ class Database {
         // Get current version
         $stmt = $db->query("SELECT MAX(version) as version FROM schema_version");
         $row = $stmt->fetch();
+        $stmt->closeCursor();
         $currentVersion = (int)($row['version'] ?? 1);
-        
-        // Run migrations
-        if ($currentVersion < 2) {
-            self::migrateToV2();
-        }
 
-        if ($currentVersion < 3) {
-            self::migrateToV3();
-        }
+        $migrations = [
+            2 => 'migrateToV2',
+            3 => 'migrateToV3',
+            4 => 'migrateToV4',
+            5 => 'migrateToV5',
+            6 => 'migrateToV6',
+            7 => 'migrateToV7',
+            8 => 'migrateToV8',
+            9 => 'migrateToV9',
+            10 => 'migrateToV10',
+            11 => 'migrateToV11',
+            12 => 'migrateToV12',
+            13 => 'migrateToV13',
+            14 => 'migrateToV14',
+            15 => 'migrateToV15',
+            16 => 'migrateToV16',
+            17 => 'migrateToV17',
+        ];
 
-        if ($currentVersion < 4) {
-            self::migrateToV4();
-        }
+        foreach ($migrations as $targetVersion => $methodName) {
+            if ($currentVersion >= $targetVersion) {
+                continue;
+            }
 
-        if ($currentVersion < 5) {
-            self::migrateToV5();
-        }
-
-        if ($currentVersion < 6) {
-            self::migrateToV6();
-        }
-
-        if ($currentVersion < 7) {
-            self::migrateToV7();
-        }
-
-        if ($currentVersion < 8) {
-            self::migrateToV8();
-        }
-
-        if ($currentVersion < 9) {
-            self::migrateToV9();
-        }
-
-        if ($currentVersion < 10) {
-            self::migrateToV10();
-        }
-
-        if ($currentVersion < 11) {
-            self::migrateToV11();
-        }
-
-        if ($currentVersion < 12) {
-            self::migrateToV12();
-        }
-
-        if ($currentVersion < 13) {
-            self::migrateToV13();
-        }
-
-        if ($currentVersion < 14) {
-            self::migrateToV14();
-        }
-
-        if ($currentVersion < 15) {
-            self::migrateToV15();
+            self::backupDatabaseBeforeMigration($db, $currentVersion, $targetVersion);
+            self::{$methodName}();
+            $currentVersion = $targetVersion;
         }
     }
     
@@ -632,6 +606,78 @@ class Database {
         $db->exec("INSERT INTO schema_version (version) VALUES (15)");
     }
 
+    /**
+     * Migration to v16: Workflows Studio AI history persistence
+     */
+    private static function migrateToV16(): void {
+        $db = self::$instance;
+
+        self::createWorkflowsStudioAiHistoryTables($db);
+
+        $db->exec("INSERT INTO schema_version (version) VALUES (16)");
+    }
+
+    /**
+     * Migration to v17: Allow AI-specific Workflow Studio version sources
+     */
+    private static function migrateToV17(): void {
+        $db = self::$instance;
+
+        self::recreateWorkflowsStudioVersionTables($db);
+
+        $db->exec("INSERT INTO schema_version (version) VALUES (17)");
+    }
+
+    private static function backupDatabaseBeforeMigration(PDO $db, int $fromVersion, int $toVersion): string {
+        $databasePath = self::getSqliteDatabasePath($db);
+        if ($databasePath === null || $databasePath === '') {
+            throw new RuntimeException('Unable to determine the SQLite database path before migration');
+        }
+
+        $backupDir = dirname($databasePath) . '/db-backups';
+        if (!is_dir($backupDir) && !@mkdir($backupDir, 0755, true) && !is_dir($backupDir)) {
+            throw new RuntimeException('Unable to create database backup directory: ' . $backupDir);
+        }
+
+        $baseName = pathinfo($databasePath, PATHINFO_FILENAME);
+        $timestamp = date('Ymd_His');
+        $backupPath = $backupDir . '/' . $baseName . '.pre-v' . $toVersion . '.' . $timestamp . '.' . substr(bin2hex(random_bytes(4)), 0, 8) . '.db';
+        $quotedBackupPath = self::quoteSqliteString($backupPath);
+
+        $backupConnection = null;
+        try {
+            $backupConnection = new PDO(
+                'sqlite:' . $databasePath,
+                null,
+                null,
+                [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                ]
+            );
+            $backupConnection->exec('PRAGMA busy_timeout = 5000');
+            $backupConnection->exec("VACUUM main INTO '{$quotedBackupPath}'");
+        } catch (Throwable $e) {
+            throw new RuntimeException(
+                'Failed to create database backup before migrating from v' . $fromVersion . ' to v' . $toVersion . ': ' . $e->getMessage(),
+                0,
+                $e
+            );
+        } finally {
+            $backupConnection = null;
+        }
+
+        error_log(sprintf(
+            'Created Doki database backup before migration v%s->v%s: %s',
+            $fromVersion,
+            $toVersion,
+            $backupPath
+        ));
+
+        return $backupPath;
+    }
+
     private static function createTables(): void {
         $db = self::$instance;
 
@@ -932,6 +978,7 @@ class Database {
         ");
 
         self::createWorkflowsStudioTables($db);
+        self::createWorkflowsStudioAiHistoryTables($db);
 
         // App Studio AI async jobs
         $db->exec("
@@ -1104,7 +1151,7 @@ class Database {
                 id TEXT PRIMARY KEY,
                 project_id TEXT NOT NULL,
                 version_number INTEGER NOT NULL,
-                source TEXT NOT NULL CHECK (source IN ('manual-save', 'publish', 'restore')),
+                source TEXT NOT NULL CHECK (source IN ('manual-save', 'publish', 'restore', 'ai-apply', 'ai-revert')),
                 snapshot_json TEXT NOT NULL,
                 validation_json TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -1147,7 +1194,7 @@ class Database {
                 id TEXT PRIMARY KEY,
                 project_id TEXT NOT NULL,
                 version_number INTEGER NOT NULL,
-                source TEXT NOT NULL CHECK (source IN ('manual-save', 'publish', 'restore')),
+                source TEXT NOT NULL CHECK (source IN ('manual-save', 'publish', 'restore', 'ai-apply', 'ai-revert')),
                 snapshot_json TEXT NOT NULL,
                 validation_json TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -1168,5 +1215,220 @@ class Database {
         $db->exec("CREATE INDEX IF NOT EXISTS idx_template_studio_projects_updated_at ON template_studio_projects(updated_at)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_template_studio_projects_repository ON template_studio_projects(repository_id)");
         $db->exec("CREATE INDEX IF NOT EXISTS idx_template_studio_versions_project ON template_studio_versions(project_id, version_number DESC)");
+    }
+
+    private static function createWorkflowsStudioAiHistoryTables(PDO $db): void {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS workflow_studio_ai_threads (
+                id TEXT PRIMARY KEY,
+                project_type TEXT NOT NULL CHECK (project_type IN ('workflow', 'template')),
+                project_id TEXT NOT NULL,
+                owner_user_id TEXT,
+                owner_username TEXT,
+                title TEXT,
+                status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
+                last_event_at TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                created_by TEXT,
+                FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL,
+                FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+                UNIQUE (project_type, project_id, owner_user_id)
+            )
+        ");
+
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS workflow_studio_ai_events (
+                id TEXT PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                project_type TEXT NOT NULL CHECK (project_type IN ('workflow', 'template')),
+                project_id TEXT NOT NULL,
+                sequence_number INTEGER NOT NULL,
+                event_type TEXT NOT NULL CHECK (event_type IN ('user-prompt', 'assistant-proposal', 'assistant-error', 'apply', 'dismiss', 'revert', 'save', 'publish')),
+                actor_user_id TEXT,
+                actor_username TEXT,
+                provider_id TEXT,
+                provider_name TEXT,
+                model TEXT,
+                prompt_text TEXT,
+                message_text TEXT,
+                summary TEXT,
+                notes_json TEXT,
+                actions_json TEXT,
+                validation_before_json TEXT,
+                validation_after_json TEXT,
+                draft_before_json TEXT,
+                draft_after_json TEXT,
+                base_version_id TEXT,
+                result_version_id TEXT,
+                proposal_status TEXT CHECK (proposal_status IN ('proposed', 'applied', 'dismissed', 'reverted', 'superseded', 'error')),
+                applied_event_id TEXT,
+                reverted_event_id TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (thread_id) REFERENCES workflow_studio_ai_threads(id) ON DELETE CASCADE,
+                FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
+                FOREIGN KEY (applied_event_id) REFERENCES workflow_studio_ai_events(id) ON DELETE SET NULL,
+                FOREIGN KEY (reverted_event_id) REFERENCES workflow_studio_ai_events(id) ON DELETE SET NULL,
+                UNIQUE (thread_id, sequence_number)
+            )
+        ");
+
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_workflow_studio_ai_threads_project ON workflow_studio_ai_threads(project_type, project_id, last_event_at DESC, created_at DESC)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_workflow_studio_ai_threads_owner ON workflow_studio_ai_threads(owner_user_id, project_type, project_id)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_workflow_studio_ai_events_thread_sequence ON workflow_studio_ai_events(thread_id, sequence_number ASC)");
+        $db->exec("CREATE INDEX IF NOT EXISTS idx_workflow_studio_ai_events_project_type ON workflow_studio_ai_events(project_type, project_id, event_type, created_at DESC)");
+    }
+
+    private static function recreateWorkflowsStudioVersionTables(PDO $db): void {
+        self::rebuildWorkflowsStudioVersionTable(
+            $db,
+            'workflow_studio_versions',
+            'workflow_studio_versions_old',
+            'workflow_studio_projects',
+            'idx_workflow_studio_versions_project'
+        );
+
+        self::rebuildWorkflowsStudioVersionTable(
+            $db,
+            'template_studio_versions',
+            'template_studio_versions_old',
+            'template_studio_projects',
+            'idx_template_studio_versions_project'
+        );
+    }
+
+    private static function rebuildWorkflowsStudioVersionTable(
+        PDO $db,
+        string $tableName,
+        string $backupTableName,
+        string $projectTableName,
+        string $indexName
+    ): void {
+        $tableExists = self::sqliteTableExists($db, $tableName);
+        $backupExists = self::sqliteTableExists($db, $backupTableName);
+        $supportsAiSources = $tableExists && self::versionTableSupportsAiSources($db, $tableName);
+
+        if ($supportsAiSources) {
+            // A prior migration may have completed the new table but left behind
+            // the old backup table or its index. Normalize that state without
+            // forcing the backup cleanup to succeed.
+            $db->exec("DROP INDEX IF EXISTS {$indexName}");
+            $db->exec("CREATE INDEX IF NOT EXISTS {$indexName} ON {$tableName}(project_id, version_number DESC)");
+            self::dropTableIfUnlocked($db, $backupTableName);
+            return;
+        }
+
+        $db->beginTransaction();
+        try {
+            if ($tableExists && !$backupExists) {
+                $db->exec("ALTER TABLE {$tableName} RENAME TO {$backupTableName}");
+                $tableExists = false;
+                $backupExists = true;
+            }
+
+            // The named index from the pre-migration table prevents creating the
+            // replacement index if the old backup table is still around.
+            $db->exec("DROP INDEX IF EXISTS {$indexName}");
+
+            if (!self::sqliteTableExists($db, $tableName)) {
+                $db->exec(self::buildWorkflowsStudioVersionTableSql($tableName, $projectTableName));
+            }
+
+            if (self::sqliteTableExists($db, $backupTableName)) {
+                $db->exec("
+                    INSERT OR IGNORE INTO {$tableName} (
+                        id, project_id, version_number, source, snapshot_json, validation_json, created_at, created_by
+                    )
+                    SELECT id, project_id, version_number, source, snapshot_json, validation_json, created_at, created_by
+                    FROM {$backupTableName}
+                ");
+            }
+
+            $db->exec("CREATE INDEX IF NOT EXISTS {$indexName} ON {$tableName}(project_id, version_number DESC)");
+            $db->commit();
+        } catch (Throwable $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw $e;
+        }
+
+        self::dropTableIfUnlocked($db, $backupTableName);
+    }
+
+    private static function buildWorkflowsStudioVersionTableSql(string $tableName, string $projectTableName): string {
+        return "
+            CREATE TABLE {$tableName} (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                version_number INTEGER NOT NULL,
+                source TEXT NOT NULL CHECK (source IN ('manual-save', 'publish', 'restore', 'ai-apply', 'ai-revert')),
+                snapshot_json TEXT NOT NULL,
+                validation_json TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                created_by TEXT,
+                FOREIGN KEY (project_id) REFERENCES {$projectTableName}(id) ON DELETE CASCADE,
+                FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+                UNIQUE(project_id, version_number)
+            )
+        ";
+    }
+
+    private static function versionTableSupportsAiSources(PDO $db, string $tableName): bool {
+        $sql = self::getCreateTableSql($db, $tableName);
+        if ($sql === null) {
+            return false;
+        }
+
+        return str_contains($sql, "'ai-apply'") && str_contains($sql, "'ai-revert'");
+    }
+
+    private static function sqliteTableExists(PDO $db, string $tableName): bool {
+        $stmt = $db->prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1");
+        $stmt->execute([$tableName]);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    private static function getCreateTableSql(PDO $db, string $tableName): ?string {
+        $stmt = $db->prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1");
+        $stmt->execute([$tableName]);
+        $sql = $stmt->fetchColumn();
+
+        return is_string($sql) ? $sql : null;
+    }
+
+    private static function getSqliteDatabasePath(PDO $db): ?string {
+        $stmt = $db->query("PRAGMA database_list");
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->closeCursor();
+        foreach ($rows as $row) {
+            if (($row['name'] ?? '') !== 'main') {
+                continue;
+            }
+
+            $path = trim((string)($row['file'] ?? ''));
+            if ($path !== '') {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
+    private static function quoteSqliteString(string $value): string {
+        return str_replace("'", "''", $value);
+    }
+
+    private static function dropTableIfUnlocked(PDO $db, string $tableName): void {
+        if (!self::sqliteTableExists($db, $tableName)) {
+            return;
+        }
+
+        try {
+            $db->exec("DROP TABLE {$tableName}");
+        } catch (PDOException $e) {
+            if (stripos($e->getMessage(), 'locked') === false) {
+                throw $e;
+            }
+        }
     }
 }

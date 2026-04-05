@@ -221,6 +221,43 @@ class PermissionManager {
     }
 
     /**
+     * Returns true only when access was explicitly granted through a user
+     * override or a whitelist group rule for the exact resource.
+     */
+    public function hasExplicitResourceGrant(array $user, string $resourceType, string $resourceId): bool {
+        $userId = trim((string)($user['id'] ?? ''));
+        $resourceType = trim($resourceType);
+        $resourceId = trim($resourceId);
+
+        if ($userId === '' || $resourceType === '' || $resourceId === '') {
+            return false;
+        }
+
+        $stmt = $this->db->prepare(
+            "SELECT action FROM user_permissions
+             WHERE user_id = ? AND resource_type = ? AND resource_id = ?
+             LIMIT 1"
+        );
+        $stmt->execute([$userId, $resourceType, $resourceId]);
+        $override = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($override) {
+            return ($override['action'] ?? '') === 'allow';
+        }
+
+        $stmt = $this->db->prepare(
+            "SELECT 1 FROM group_permissions gp
+             JOIN group_members gm ON gm.group_id = gp.group_id
+             JOIN permission_groups pg ON pg.id = gp.group_id
+             WHERE gm.user_id = ? AND gp.resource_type = ? AND gp.resource_id = ?
+               AND pg.mode = 'whitelist'
+             LIMIT 1"
+        );
+        $stmt->execute([$userId, $resourceType, $resourceId]);
+
+        return (bool)$stmt->fetchColumn();
+    }
+
+    /**
      * Get the first accessible page URL for a user.
      * Checks modules and apps in sidebar order, returns the first allowed one.
      * Returns null if nothing is accessible (shouldn't happen for valid users).

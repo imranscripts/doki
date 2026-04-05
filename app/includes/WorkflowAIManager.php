@@ -57,6 +57,7 @@ class WorkflowAIManager {
         $currentDraft = is_array($options['currentDraft'] ?? null) ? $options['currentDraft'] : [];
         $currentDraft = $this->normalizeExistingDraft($type, $currentDraft);
         $conversation = $this->normalizeConversation($options['conversation'] ?? []);
+        $proposalHistory = $this->normalizeProposalHistory($options['proposalHistory'] ?? []);
         $currentValidation = is_array($options['currentValidation'] ?? null) ? $options['currentValidation'] : [];
         $editMode = !empty($options['editMode']) && $currentDraft !== [];
         $model = $this->resolveModel($resolvedProvider, trim((string)($options['model'] ?? '')));
@@ -66,7 +67,7 @@ class WorkflowAIManager {
 
         $messages = [
             ['role' => 'system', 'content' => $this->buildSystemPrompt($type)],
-            ['role' => 'user', 'content' => $this->buildUserPrompt($type, $prompt, $currentDraft, $conversation, $currentValidation, $editMode)],
+            ['role' => 'user', 'content' => $this->buildUserPrompt($type, $prompt, $currentDraft, $conversation, $proposalHistory, $currentValidation, $editMode)],
         ];
 
         $chatResult = $this->providerManager->sendChat($resolvedProvider, $model['model'], $messages);
@@ -211,6 +212,9 @@ Rules:
 - Remove fields, inputs, requirements, or runtime details that are unrelated to the new request instead of carrying them forward.
 - Doki supports run-level dry runs that record a redacted command preview without executing, and workflow drafts can be dry-run in Workflows Studio before publish. Do not add a permanent dryRun field to the template draft unless the schema explicitly requires it.
 - Do not publish anything. You are only creating a draft for review.
+- The current draft supplied in the prompt is the source of truth.
+- Prior AI proposals may appear in the conversation with status metadata. Proposed or dismissed proposals did not change the draft unless they were later applied.
+- A reverted proposal was applied at least once and later undone. Use the current draft to determine the latest real state.
 PROMPT;
         }
 
@@ -276,6 +280,9 @@ Rules:
 - Remove unrelated steps, inputs, tags, or secrets from older drafts instead of carrying them forward.
 - Doki supports run-level dry runs that record a redacted command preview without executing, and workflow drafts can be dry-run in Workflows Studio before publish. Do not add a permanent dryRun field to the workflow draft unless the schema explicitly requires it.
 - Do not publish anything. You are only creating a draft for review.
+- The current draft supplied in the prompt is the source of truth.
+- Prior AI proposals may appear in the conversation with status metadata. Proposed or dismissed proposals did not change the draft unless they were later applied.
+- A reverted proposal was applied at least once and later undone. Use the current draft to determine the latest real state.
 PROMPT;
     }
 
@@ -284,6 +291,7 @@ PROMPT;
         string $prompt,
         array $currentDraft,
         array $conversation,
+        array $proposalHistory,
         array $currentValidation,
         bool $editMode
     ): string {
@@ -357,16 +365,29 @@ PROMPT;
 
         if ($conversation !== []) {
             $lines[] = '';
-            $lines[] = '[Recent conversation]';
+            $lines[] = '[Conversation history]';
             foreach ($conversation as $message) {
-                $prefix = ($message['role'] ?? 'user') === 'assistant' ? 'Assistant' : 'User';
-                $content = trim((string)($message['content'] ?? ''));
-                if ($content === '') {
-                    continue;
+                $formatted = $this->formatConversationMessageForPrompt($message);
+                if ($formatted !== '') {
+                    $lines[] = '- ' . $formatted;
                 }
-                $lines[] = '- ' . $prefix . ': ' . $content;
             }
-            $lines[] = '[/Recent conversation]';
+            $lines[] = '[/Conversation history]';
+        }
+
+        if ($proposalHistory !== []) {
+            $lines[] = '';
+            $lines[] = '[Proposal state history]';
+            $lines[] = 'Use this to understand which prior AI edits changed the draft and which ones did not.';
+            foreach ($proposalHistory as $proposal) {
+                $formatted = $this->formatProposalHistoryEntry($proposal);
+                if ($formatted !== '') {
+                    $lines[] = '- ' . $formatted;
+                }
+            }
+            $lines[] = '[/Proposal state history]';
+            $lines[] = '';
+            $lines[] = 'The current draft is authoritative if any proposal text conflicts with these status annotations.';
         }
 
         if ($currentValidation !== []) {
@@ -885,7 +906,7 @@ PROMPT;
         }
 
         $normalized = [];
-        foreach (array_slice($conversation, -6) as $message) {
+        foreach ($conversation as $message) {
             if (!is_array($message)) {
                 continue;
             }
@@ -897,13 +918,174 @@ PROMPT;
                 continue;
             }
 
-            $normalized[] = [
+            $normalizedMessage = [
                 'role' => $role,
                 'content' => $content,
+            ];
+
+            foreach (['kind', 'summary', 'proposalStatus', 'createdAt', 'appliedAt', 'appliedByUsername', 'revertedAt', 'revertedByUsername', 'actorUsername'] as $key) {
+                if (isset($message[$key]) && trim((string)$message[$key]) !== '') {
+                    $normalizedMessage[$key] = trim((string)$message[$key]);
+                }
+            }
+
+            $normalized[] = $normalizedMessage;
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeProposalHistory($proposalHistory): array {
+        if (!is_array($proposalHistory)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($proposalHistory as $proposal) {
+            if (!is_array($proposal)) {
+                continue;
+            }
+
+            $proposalStatus = trim((string)($proposal['proposalStatus'] ?? ''));
+            $content = trim((string)($proposal['content'] ?? ''));
+            $summary = trim((string)($proposal['summary'] ?? ''));
+            if ($proposalStatus === '' && $content === '' && $summary === '') {
+                continue;
+            }
+
+            $normalized[] = [
+                'summary' => $summary,
+                'content' => $content,
+                'proposalStatus' => $proposalStatus,
+                'createdAt' => trim((string)($proposal['createdAt'] ?? '')),
+                'appliedAt' => trim((string)($proposal['appliedAt'] ?? '')),
+                'appliedByUsername' => trim((string)($proposal['appliedByUsername'] ?? '')),
+                'revertedAt' => trim((string)($proposal['revertedAt'] ?? '')),
+                'revertedByUsername' => trim((string)($proposal['revertedByUsername'] ?? '')),
             ];
         }
 
         return $normalized;
+    }
+
+    private function formatConversationMessageForPrompt(array $message): string {
+        $content = trim((string)($message['content'] ?? ''));
+        if ($content === '') {
+            return '';
+        }
+
+        $role = ($message['role'] ?? 'user') === 'assistant' ? 'Assistant' : 'User';
+        $details = [];
+        $kind = trim((string)($message['kind'] ?? ''));
+
+        if ($kind === 'assistant-proposal') {
+            $details[] = 'proposal';
+            $statusLabel = $this->formatProposalStatusLabel((string)($message['proposalStatus'] ?? ''));
+            if ($statusLabel !== '') {
+                $details[] = 'status: ' . $statusLabel;
+            }
+            $summary = trim((string)($message['summary'] ?? ''));
+            if ($summary !== '') {
+                $details[] = 'summary: ' . $summary;
+            }
+            if (trim((string)($message['appliedAt'] ?? '')) !== '') {
+                $details[] = 'applied at ' . trim((string)$message['appliedAt']);
+            }
+            if (trim((string)($message['revertedAt'] ?? '')) !== '') {
+                $details[] = 'reverted at ' . trim((string)$message['revertedAt']);
+            }
+        } elseif ($kind === 'assistant-error') {
+            $details[] = 'error';
+        }
+
+        if (trim((string)($message['createdAt'] ?? '')) !== '') {
+            $details[] = 'at ' . trim((string)$message['createdAt']);
+        }
+
+        if ($details !== []) {
+            $role .= ' (' . implode(', ', $details) . ')';
+        }
+
+        return $role . ': ' . $content;
+    }
+
+    private function formatProposalHistoryEntry(array $proposal): string {
+        $content = trim((string)($proposal['content'] ?? ''));
+        $summary = trim((string)($proposal['summary'] ?? ''));
+        $label = $summary !== '' ? $summary : $this->truncateInlineText($content, 160);
+        if ($label === '') {
+            return '';
+        }
+
+        $statusLabel = $this->formatProposalStatusLabel((string)($proposal['proposalStatus'] ?? ''));
+        $parts = [$label];
+        if ($statusLabel !== '') {
+            $parts[] = 'status: ' . $statusLabel;
+        }
+
+        $meaning = $this->describeProposalStatusMeaning((string)($proposal['proposalStatus'] ?? ''));
+        if ($meaning !== '') {
+            $parts[] = $meaning;
+        }
+
+        if (trim((string)($proposal['createdAt'] ?? '')) !== '') {
+            $parts[] = 'proposed at ' . trim((string)$proposal['createdAt']);
+        }
+        if (trim((string)($proposal['appliedAt'] ?? '')) !== '') {
+            $appliedBy = trim((string)($proposal['appliedByUsername'] ?? ''));
+            $parts[] = 'applied at ' . trim((string)$proposal['appliedAt']) . ($appliedBy !== '' ? ' by ' . $appliedBy : '');
+        }
+        if (trim((string)($proposal['revertedAt'] ?? '')) !== '') {
+            $revertedBy = trim((string)($proposal['revertedByUsername'] ?? ''));
+            $parts[] = 'reverted at ' . trim((string)$proposal['revertedAt']) . ($revertedBy !== '' ? ' by ' . $revertedBy : '');
+        }
+
+        return implode(' | ', array_filter($parts));
+    }
+
+    private function formatProposalStatusLabel(string $status): string {
+        return match (strtolower(trim($status))) {
+            'proposed' => 'pending',
+            'applied' => 'applied',
+            'dismissed' => 'not applied',
+            'reverted' => 'reverted',
+            'superseded' => 'superseded',
+            'error' => 'error',
+            default => '',
+        };
+    }
+
+    private function describeProposalStatusMeaning(string $status): string {
+        return match (strtolower(trim($status))) {
+            'proposed' => 'This proposal has not been applied to the draft yet.',
+            'dismissed' => 'This proposal was reviewed and not applied to the draft.',
+            'applied' => 'This proposal changed the draft at least once.',
+            'reverted' => 'This proposal was applied and later undone.',
+            'superseded' => 'This proposal was replaced by a later proposal.',
+            'error' => 'This was an AI error response, not a usable draft change.',
+            default => '',
+        };
+    }
+
+    private function truncateInlineText(string $text, int $maxLength = 160): string {
+        $text = preg_replace('/\s+/', ' ', trim($text)) ?? trim($text);
+        if ($text === '' || $maxLength < 4) {
+            return $text;
+        }
+
+        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+            if (mb_strlen($text) <= $maxLength) {
+                return $text;
+            }
+
+            return rtrim(mb_substr($text, 0, $maxLength - 3)) . '...';
+        }
+
+        if (strlen($text) <= $maxLength) {
+            return $text;
+        }
+
+        return rtrim(substr($text, 0, $maxLength - 3)) . '...';
     }
 
     private function formatValidationForPrompt(array $validation): string {

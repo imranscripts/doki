@@ -124,7 +124,7 @@ class TemplateStudioManager {
                 ]);
             }
 
-            $this->createVersion($projectId, 'manual-save', $payload['draft'], null, $userId);
+            $versionId = $this->createVersion($projectId, 'manual-save', $payload['draft'], null, $userId);
             $this->db->commit();
 
             if ($this->auth) {
@@ -138,7 +138,7 @@ class TemplateStudioManager {
                 );
             }
 
-            return ['success' => true, 'project' => $this->getProject($projectId)];
+            return ['success' => true, 'project' => $this->getProject($projectId), 'versionId' => $versionId];
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
@@ -326,7 +326,7 @@ class TemplateStudioManager {
                 $projectId,
             ]);
 
-            $this->createVersion($projectId, 'publish', $draft, $validation, $userId);
+            $versionId = $this->createVersion($projectId, 'publish', $draft, $validation, $userId);
             $this->db->commit();
 
             if ($this->auth) {
@@ -345,6 +345,7 @@ class TemplateStudioManager {
                 'project' => $this->getProject($projectId),
                 'validation' => $validation,
                 'template' => $loaded,
+                'versionId' => $versionId,
             ];
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
@@ -384,6 +385,84 @@ class TemplateStudioManager {
 
     public function getDefaultDraft(): array {
         return $this->buildDefaultDraft();
+    }
+
+    public function replaceDraftSnapshot(
+        string $projectId,
+        array $snapshot,
+        string $userId,
+        string $versionSource = 'restore'
+    ): array {
+        $project = $this->getProject($projectId);
+        if ($project === null) {
+            return ['success' => false, 'error' => 'Template project not found'];
+        }
+
+        $payload = $this->normalizeProjectInput([
+            'name' => $snapshot['name'] ?? $project['name'],
+            'description' => $snapshot['description'] ?? $project['description'],
+            'templateId' => $snapshot['id'] ?? $project['templateId'],
+            'status' => $project['status'] ?? self::STATUS_DRAFT,
+            'sourceType' => $project['sourceType'] ?? 'local',
+            'repositoryId' => $project['repositoryId'] ?? '',
+            'sourcePath' => $project['sourcePath'] ?? '',
+            'sourceRef' => $project['sourceRef'] ?? '',
+            'draft' => $snapshot,
+        ], $project);
+        $validated = $this->validateDraftPayload($payload);
+        $draft = is_array($validated['draft'] ?? null) ? $validated['draft'] : $payload['draft'];
+        $validation = is_array($validated['validation'] ?? null) ? $validated['validation'] : null;
+
+        try {
+            $this->db->beginTransaction();
+            $stmt = $this->db->prepare("
+                UPDATE template_studio_projects
+                SET name = ?,
+                    description = ?,
+                    status = ?,
+                    template_id = ?,
+                    source_type = ?,
+                    repository_id = ?,
+                    source_path = ?,
+                    source_ref = ?,
+                    draft_json = ?,
+                    last_validation_json = ?,
+                    updated_at = datetime('now'),
+                    updated_by = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $payload['name'],
+                $payload['description'],
+                $payload['status'],
+                $payload['templateId'] !== '' ? $payload['templateId'] : null,
+                $payload['sourceType'],
+                $payload['repositoryId'] !== '' ? $payload['repositoryId'] : null,
+                $payload['sourcePath'] !== '' ? $payload['sourcePath'] : null,
+                $payload['sourceRef'] !== '' ? $payload['sourceRef'] : null,
+                json_encode($draft, JSON_UNESCAPED_SLASHES),
+                $validation !== null ? json_encode($validation, JSON_UNESCAPED_SLASHES) : null,
+                $userId,
+                $projectId,
+            ]);
+
+            $versionId = $this->createVersion($projectId, $versionSource, $draft, $validation, $userId);
+            $this->db->commit();
+
+            return [
+                'success' => true,
+                'project' => $this->getProject($projectId),
+                'draft' => $draft,
+                'validation' => $validation,
+                'versionId' => $versionId,
+            ];
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+
+            return ['success' => false, 'error' => 'Failed to replace template draft snapshot: ' . $e->getMessage()];
+        }
     }
 
     private function normalizeProjectInput(array $input, ?array $existing): array {
@@ -482,10 +561,11 @@ class TemplateStudioManager {
         ];
     }
 
-    private function createVersion(string $projectId, string $source, array $snapshot, ?array $validation, string $userId): void {
+    private function createVersion(string $projectId, string $source, array $snapshot, ?array $validation, string $userId): string {
         $stmt = $this->db->prepare("SELECT COALESCE(MAX(version_number), 0) AS version_number FROM template_studio_versions WHERE project_id = ?");
         $stmt->execute([$projectId]);
         $nextVersion = ((int)($stmt->fetch(PDO::FETCH_ASSOC)['version_number'] ?? 0)) + 1;
+        $versionId = Database::generateUUID();
 
         $insert = $this->db->prepare("
             INSERT INTO template_studio_versions (
@@ -493,7 +573,7 @@ class TemplateStudioManager {
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
         $insert->execute([
-            Database::generateUUID(),
+            $versionId,
             $projectId,
             $nextVersion,
             $source,
@@ -501,6 +581,8 @@ class TemplateStudioManager {
             $validation !== null ? json_encode($validation, JSON_UNESCAPED_SLASHES) : null,
             $userId,
         ]);
+
+        return $versionId;
     }
 
     private function writePublishedTemplate(array $template): array {

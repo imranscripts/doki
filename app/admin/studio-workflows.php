@@ -51,6 +51,11 @@ $templateRepoCount = count(array_filter(
 $workflowContextCount = count($workflowContextBlocks);
 
 $initialStudioState = [
+    'viewer' => [
+        'id' => (string)($user['id'] ?? ''),
+        'username' => (string)($user['username'] ?? ''),
+        'role' => (string)($user['role'] ?? ''),
+    ],
     'workflowProjects' => $workflowProjects,
     'templateProjects' => $templateProjects,
     'workflowDefaults' => $workflowStudioManager->getDefaultDraft(),
@@ -1623,6 +1628,97 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             gap: 8px;
         }
 
+        .studio-ai-thread-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .studio-ai-thread-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border-primary);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease;
+        }
+
+        .studio-ai-thread-tab:hover {
+            border-color: rgba(88, 166, 255, 0.34);
+            color: var(--text-primary);
+            transform: translateY(-1px);
+        }
+
+        .studio-ai-thread-tab.active {
+            border-color: rgba(88, 166, 255, 0.38);
+            background: rgba(88, 166, 255, 0.12);
+            color: var(--text-primary);
+        }
+
+        .studio-ai-thread-tab-name {
+            font-weight: 700;
+        }
+
+        .studio-ai-thread-tab-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 7px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            background: rgba(148, 163, 184, 0.16);
+            color: var(--text-muted);
+        }
+
+        .studio-ai-thread-tab-badge.pending {
+            background: rgba(245, 158, 11, 0.14);
+            color: #fbbf24;
+        }
+
+        .studio-ai-thread-tab-badge.applied {
+            background: rgba(34, 197, 94, 0.14);
+            color: #86efac;
+        }
+
+        .studio-ai-thread-tab-badge.dismissed,
+        .studio-ai-thread-tab-badge.not-applied {
+            background: rgba(148, 163, 184, 0.14);
+            color: #cbd5e1;
+        }
+
+        .studio-ai-thread-tab-badge.reverted {
+            background: rgba(251, 191, 36, 0.14);
+            color: #fde68a;
+        }
+
+        .studio-ai-thread-tab-badge.error {
+            background: rgba(239, 68, 68, 0.14);
+            color: #fca5a5;
+        }
+
+        .studio-ai-history-notice {
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border-primary);
+            background: rgba(255,255,255,0.03);
+            color: var(--text-secondary);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .studio-ai-history-notice.readonly {
+            border-color: rgba(245, 158, 11, 0.3);
+            background: rgba(245, 158, 11, 0.08);
+            color: #f5d88a;
+        }
+
         .studio-ai-messages {
             display: flex;
             flex-direction: column;
@@ -1665,8 +1761,11 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             color: var(--text-primary);
             font-size: 13px;
             line-height: 1.6;
-            white-space: pre-wrap;
             word-break: break-word;
+        }
+
+        .studio-ai-content {
+            white-space: pre-wrap;
         }
 
         .studio-ai-message.user .studio-ai-bubble {
@@ -2437,6 +2536,10 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             gap: 10px;
         }
 
+        .studio-ai-composer.is-readonly {
+            opacity: 0.8;
+        }
+
         .studio-ai-composer .studio-textarea {
             min-height: 108px;
             font-family: inherit;
@@ -2861,6 +2964,8 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                                             <a class="studio-link-inline" href="ai.php">Context</a>
                                         </div>
                                     </div>
+                                    <div class="studio-ai-thread-tabs" id="aiThreadTabs" hidden></div>
+                                    <div class="studio-ai-history-notice" id="aiHistoryNotice" hidden></div>
                                     <div id="aiMessages" class="studio-ai-messages" aria-live="polite"></div>
                                     <div class="studio-ai-plan-box" id="aiPlanBox">
                                         <h3 class="studio-ai-plan-title">Pending Changes</h3>
@@ -2896,7 +3001,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                                     <form class="studio-ai-composer" id="aiChatForm">
                                         <textarea class="studio-textarea" id="aiPrompt" placeholder="Ask AI to create or edit this workflow. Example: replace the summary with a cleaner output or add one more step."></textarea>
                                         <div class="studio-ai-composer-row">
-                                            <span class="studio-helper">AI proposes workflow changes here. Review them before applying to the editor.</span>
+                                            <span class="studio-helper" id="aiComposerHelper">AI proposes workflow changes here. Review them before applying to the editor.</span>
                                             <div class="studio-ai-composer-actions">
                                                 <button class="studio-btn secondary" type="button" id="clearAiChatBtn">Clear</button>
                                                 <button class="studio-btn primary" type="submit" id="generateAiBtn" <?= $aiProviders === [] ? 'disabled' : '' ?>>
@@ -2988,6 +3093,16 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             isDirty: false,
             lastAiResult: null,
             aiMessages: [],
+            aiThreads: [],
+            selectedAiThreadId: '',
+            aiViewerPermissions: {
+                canViewAllThreads: false,
+                canRevertAny: false,
+            },
+            aiReadOnlyReason: '',
+            aiHistoryLoaded: false,
+            aiHistoryLoading: false,
+            aiHistoryRequestId: 0,
             aiActionBusy: false,
             pendingAiDraftMessageId: '',
             aiDiffMessageId: '',
@@ -3012,6 +3127,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             runtimeTemplates: Array.isArray(initialStudioState.runtimeTemplates) ? initialStudioState.runtimeTemplates : [],
             targets: Array.isArray(initialStudioState.targets) ? initialStudioState.targets : [],
             environments: initialStudioState.environments && typeof initialStudioState.environments === 'object' ? initialStudioState.environments : {},
+            viewer: initialStudioState.viewer && typeof initialStudioState.viewer === 'object' ? initialStudioState.viewer : { id: '', username: '', role: '' },
         };
 
         let templateById = {};
@@ -3060,6 +3176,8 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
         const workflowConnectorPopoverEl = document.getElementById('workflowConnectorPopover');
         const aiProviderSelectEl = document.getElementById('aiProviderSelect');
         const aiChatFormEl = document.getElementById('aiChatForm');
+        const aiThreadTabsEl = document.getElementById('aiThreadTabs');
+        const aiHistoryNoticeEl = document.getElementById('aiHistoryNotice');
         const aiMessagesEl = document.getElementById('aiMessages');
         const aiPlanBoxEl = document.getElementById('aiPlanBox');
         const aiPlanSummaryEl = document.getElementById('aiPlanSummary');
@@ -3072,6 +3190,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
         const aiApplyBtn = document.getElementById('aiApplyBtn');
         const aiClearPlanBtn = document.getElementById('aiClearPlanBtn');
         const aiPromptEl = document.getElementById('aiPrompt');
+        const aiComposerHelperEl = document.getElementById('aiComposerHelper');
         const clearAiChatBtn = document.getElementById('clearAiChatBtn');
         const generateAiBtn = document.getElementById('generateAiBtn');
         const aiDiffModalEl = document.getElementById('aiDiffModal');
@@ -3090,6 +3209,167 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
         let workflowBuilderEnvironment = '';
         let workflowBuilderDirtySync = false;
         let workflowConnectorStepIndex = -1;
+        const studioSelectionStorageKey = 'workflowStudio.selection.v1';
+        const viewerAiThreadId = '__viewer_thread__';
+
+        function getViewerId() {
+            return String(studioState.viewer?.id || '').trim();
+        }
+
+        function getViewerUsername() {
+            return String(studioState.viewer?.username || '').trim();
+        }
+
+        function isViewerPlaceholderThreadId(threadId) {
+            return String(threadId || '') === viewerAiThreadId;
+        }
+
+        function readStudioSelectionState() {
+            try {
+                const raw = window.sessionStorage?.getItem(studioSelectionStorageKey) || '';
+                const parsed = raw ? JSON.parse(raw) : {};
+                return {
+                    type: parsed?.type === 'template' ? 'template' : 'workflow',
+                    projectIds: parsed?.projectIds && typeof parsed.projectIds === 'object' ? parsed.projectIds : {},
+                    threadIds: parsed?.threadIds && typeof parsed.threadIds === 'object' ? parsed.threadIds : {},
+                };
+            } catch (error) {
+                return {
+                    type: 'workflow',
+                    projectIds: {},
+                    threadIds: {},
+                };
+            }
+        }
+
+        function writeStudioSelectionState(selection) {
+            try {
+                window.sessionStorage?.setItem(studioSelectionStorageKey, JSON.stringify(selection));
+            } catch (error) {
+                // Ignore storage failures and keep the UI usable.
+            }
+        }
+
+        function persistStudioSelection() {
+            const selection = readStudioSelectionState();
+            selection.type = studioState.type === 'template' ? 'template' : 'workflow';
+            selection.projectIds[selection.type] = String(studioState.selectedProjectId || '');
+            const threadKey = `${selection.type}:${String(studioState.selectedProjectId || '')}`;
+            if (studioState.selectedProjectId) {
+                selection.threadIds[threadKey] = String(studioState.selectedAiThreadId || '');
+            } else {
+                delete selection.threadIds[threadKey];
+            }
+            writeStudioSelectionState(selection);
+        }
+
+        function getPersistedStudioType() {
+            return readStudioSelectionState().type === 'template' ? 'template' : 'workflow';
+        }
+
+        function getPersistedProjectId(type) {
+            const selection = readStudioSelectionState();
+            return String(selection.projectIds?.[type === 'template' ? 'template' : 'workflow'] || '').trim();
+        }
+
+        function getPersistedThreadId(type, projectId) {
+            const selection = readStudioSelectionState();
+            const key = `${type === 'template' ? 'template' : 'workflow'}:${String(projectId || '').trim()}`;
+            return String(selection.threadIds?.[key] || '').trim();
+        }
+
+        function findAiThreadById(threadId) {
+            return (Array.isArray(studioState.aiThreads) ? studioState.aiThreads : [])
+                .find((thread) => String(thread?.id || '') === String(threadId || '')) || null;
+        }
+
+        function buildViewerPlaceholderThread(project) {
+            return {
+                id: viewerAiThreadId,
+                projectType: studioState.type,
+                projectId: String(project?.id || ''),
+                ownerUserId: getViewerId(),
+                ownerUsername: getViewerUsername() || 'You',
+                title: 'Your AI history',
+                status: 'active',
+                lastEventAt: null,
+                createdAt: null,
+                createdBy: getViewerId(),
+                isOwnedByViewer: true,
+                latestProposalStatus: '',
+                latestProposalAt: null,
+                isPlaceholder: true,
+            };
+        }
+
+        function shouldIncludeViewerPlaceholderThread(threads, project) {
+            if (!studioState.aiEnabled || !project?.id || String(project?.status || '') === 'archived') {
+                return false;
+            }
+
+            const viewerId = getViewerId();
+            return viewerId !== '' && !(Array.isArray(threads) ? threads : []).some((thread) => String(thread?.ownerUserId || '') === viewerId);
+        }
+
+        function getSelectedAiThread() {
+            const selected = findAiThreadById(studioState.selectedAiThreadId || '');
+            if (selected) {
+                return selected;
+            }
+            return isViewerPlaceholderThreadId(studioState.selectedAiThreadId || '') ? buildViewerPlaceholderThread(getSelectedProject()) : null;
+        }
+
+        function isSelectedAiThreadOwnedByViewer() {
+            const thread = getSelectedAiThread();
+            return !!thread?.isOwnedByViewer || isViewerPlaceholderThreadId(thread?.id || '');
+        }
+
+        function canRestoreSelectedAiThreadCheckpoint(message) {
+            if (!message || message.eventType !== 'assistant-proposal') {
+                return false;
+            }
+
+            const proposalStatus = normalizeAiProposalStatus(message.proposalStatus);
+            if (!['applied', 'reverted'].includes(proposalStatus)) {
+                return false;
+            }
+
+            return isSelectedAiThreadOwnedByViewer() || !!studioState.aiViewerPermissions?.canRevertAny;
+        }
+
+        function canApplyAiProposalMessage(message) {
+            return !!message
+                && message.eventType === 'assistant-proposal'
+                && isPendingAiProposal(message)
+                && isSelectedAiThreadOwnedByViewer()
+                && !isViewerPlaceholderThreadId(message.historyThreadId || '');
+        }
+
+        function canDismissAiProposalMessage(message) {
+            return canApplyAiProposalMessage(message);
+        }
+
+        function getAiReadOnlyReason() {
+            if (!studioState.aiEnabled) {
+                return 'Studio AI is disabled for this account.';
+            }
+
+            const project = getSelectedProject();
+            if (project?.status === 'archived') {
+                return 'Archived projects are view-only.';
+            }
+
+            const selectedThread = getSelectedAiThread();
+            if (selectedThread && !selectedThread.isOwnedByViewer && !isViewerPlaceholderThreadId(selectedThread.id || '')) {
+                return `Viewing ${selectedThread.ownerUsername || 'another user'}'s history. This thread is read-only.`;
+            }
+
+            return '';
+        }
+
+        function canComposeInCurrentAiContext() {
+            return getAiReadOnlyReason() === '';
+        }
 
         document.querySelectorAll('[data-type-tab]').forEach((button) => {
             button.addEventListener('click', () => switchType(button.dataset.typeTab || 'workflow'));
@@ -3107,7 +3387,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             event.preventDefault();
             generateAiDraft();
         });
-        clearAiChatBtn?.addEventListener('click', resetAiConversation);
+        clearAiChatBtn?.addEventListener('click', clearAiChatView);
         useRunBtn.addEventListener('click', () => executeCurrentProject(false));
         useDryRunBtn.addEventListener('click', () => executeCurrentProject(true));
         document.querySelectorAll('[data-editor-mode-btn]').forEach((button) => {
@@ -3177,9 +3457,11 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
         function switchType(nextType) {
             studioState.type = nextType === 'template' ? 'template' : 'workflow';
             studioState.selectedProjectId = '';
+            studioState.selectedAiThreadId = '';
             studioState.currentValidation = null;
             studioState.lastAiResult = null;
             studioState.aiMessages = [];
+            studioState.aiThreads = [];
             studioState.lastDryRunResult = null;
             studioState.useInputs = {};
             studioState.activeJobId = null;
@@ -3189,7 +3471,9 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 button.classList.toggle('active', (button.dataset.typeTab || 'workflow') === studioState.type);
             });
             renderProjectList();
-            loadDraft(null);
+            const persistedProjectId = getPersistedProjectId(studioState.type);
+            const targetProject = getProjects().find((project) => project.id === persistedProjectId) || getProjects()[0] || null;
+            loadDraft(targetProject);
         }
 
         function getProjects() {
@@ -3227,6 +3511,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 resetAiConversation(false);
             }
             studioState.selectedProjectId = project?.id || '';
+            studioState.selectedAiThreadId = nextProjectId ? getPersistedThreadId(studioState.type, nextProjectId) : '';
             studioState.currentValidation = record.lastValidation || null;
             studioState.lastDryRunResult = null;
             studioState.useInputs = {};
@@ -3281,6 +3566,16 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             useDryRunBtn.hidden = isTemplate;
             publishBtn.disabled = false;
             archiveBtn.disabled = !project;
+            persistStudioSelection();
+            renderAiComposerState();
+            if (nextProjectId) {
+                void loadAiHistoryForCurrentProject(studioState.selectedAiThreadId || '');
+            } else {
+                clearAiHistoryState({
+                    selectedThreadId: '',
+                    persist: true,
+                });
+            }
         }
 
         function switchEditorMode(nextMode) {
@@ -4536,17 +4831,54 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             }
         }
 
-        function appendAiMessage(role, content, meta = {}) {
-            const message = {
-                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        async function clearAiChatView() {
+            if (studioState.selectedProjectId) {
+                await loadAiHistoryForCurrentProject(studioState.selectedAiThreadId || '');
+                return;
+            }
+            resetAiConversation(true);
+            renderAiComposerState();
+        }
+
+        function normalizeAiProposalStatus(status) {
+            const value = String(status || '').trim().toLowerCase();
+            return ['proposed', 'applied', 'dismissed', 'reverted', 'superseded', 'error'].includes(value)
+                ? value
+                : '';
+        }
+
+        function createAiMessageRecord(role, content, meta = {}) {
+            const proposalStatus = normalizeAiProposalStatus(meta.proposalStatus);
+            return {
+                id: meta.id ? String(meta.id) : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                 role: role === 'assistant' ? 'assistant' : 'user',
+                roleLabel: meta.roleLabel ? String(meta.roleLabel) : '',
                 content: String(content || '').trim(),
                 title: meta.title ? String(meta.title) : '',
                 notes: Array.isArray(meta.notes) ? meta.notes.map((note) => String(note || '').trim()).filter(Boolean) : [],
                 providerName: meta.providerName ? String(meta.providerName) : '',
                 modelName: meta.modelName ? String(meta.modelName) : '',
-                applied: !!meta.applied,
-                reverted: !!meta.reverted,
+                actorUserId: meta.actorUserId ? String(meta.actorUserId) : '',
+                actorUsername: meta.actorUsername ? String(meta.actorUsername) : '',
+                eventType: meta.eventType ? String(meta.eventType) : '',
+                historyProjectId: meta.historyProjectId ? String(meta.historyProjectId) : '',
+                historyThreadId: meta.historyThreadId ? String(meta.historyThreadId) : '',
+                historyEventId: meta.historyEventId ? String(meta.historyEventId) : '',
+                proposalStatus,
+                appliedEventId: meta.appliedEventId ? String(meta.appliedEventId) : '',
+                revertedEventId: meta.revertedEventId ? String(meta.revertedEventId) : '',
+                resultVersionId: meta.resultVersionId ? String(meta.resultVersionId) : '',
+                createdAt: meta.createdAt ? String(meta.createdAt) : '',
+                appliedAt: meta.appliedAt ? String(meta.appliedAt) : '',
+                appliedByUsername: meta.appliedByUsername ? String(meta.appliedByUsername) : '',
+                revertedAt: meta.revertedAt ? String(meta.revertedAt) : '',
+                revertedByUsername: meta.revertedByUsername ? String(meta.revertedByUsername) : '',
+                applied: meta.applied !== undefined
+                    ? !!meta.applied
+                    : (proposalStatus === 'applied' || proposalStatus === 'reverted'),
+                reverted: meta.reverted !== undefined
+                    ? !!meta.reverted
+                    : proposalStatus === 'reverted',
                 validation: meta.validation || null,
                 validationBefore: meta.validationBefore || null,
                 versions: Array.isArray(meta.versions) ? meta.versions : [],
@@ -4554,6 +4886,10 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 draftBefore: meta.draftBefore && typeof meta.draftBefore === 'object' ? deepClone(meta.draftBefore) : null,
                 draftAfter: meta.draftAfter && typeof meta.draftAfter === 'object' ? deepClone(meta.draftAfter) : null,
             };
+        }
+
+        function appendAiMessage(role, content, meta = {}) {
+            const message = createAiMessageRecord(role, content, meta);
             studioState.aiMessages.push(message);
             return message;
         }
@@ -4563,12 +4899,478 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 .find((message) => String(message?.id || '') === String(messageId || '')) || null;
         }
 
+        function getAiMessageByHistoryEventId(eventId) {
+            return (Array.isArray(studioState.aiMessages) ? studioState.aiMessages : [])
+                .find((message) => String(message?.historyEventId || '') === String(eventId || '')) || null;
+        }
+
+        function isPendingAiProposal(message) {
+            if (
+                !message
+                || String(message.eventType || '').trim() !== 'assistant-proposal'
+                || !message.draftAfter
+                || typeof message.draftAfter !== 'object'
+            ) {
+                return false;
+            }
+
+            const proposalStatus = normalizeAiProposalStatus(message.proposalStatus);
+            if (proposalStatus) {
+                return proposalStatus === 'proposed';
+            }
+
+            return !message.applied && !message.reverted;
+        }
+
         function getPendingAiDraftMessage() {
             const message = getAiMessageById(studioState.pendingAiDraftMessageId || '');
-            if (!message || !message.draftAfter || typeof message.draftAfter !== 'object') {
+            if (!isPendingAiProposal(message)) {
                 return null;
             }
             return message;
+        }
+
+        function syncAiProposalMessageFromEvent(message, proposalEvent) {
+            if (!message || !proposalEvent || proposalEvent.eventType !== 'assistant-proposal') {
+                return message;
+            }
+
+            const proposalStatus = normalizeAiProposalStatus(proposalEvent.proposalStatus || message.proposalStatus);
+            message.eventType = String(proposalEvent.eventType || message.eventType || '');
+            message.historyProjectId = String(proposalEvent.projectId || message.historyProjectId || '');
+            message.historyThreadId = String(proposalEvent.threadId || message.historyThreadId || '');
+            message.historyEventId = String(proposalEvent.id || message.historyEventId || '');
+            message.proposalStatus = proposalStatus;
+            message.appliedEventId = String(proposalEvent.appliedEventId || message.appliedEventId || '');
+            message.revertedEventId = String(proposalEvent.revertedEventId || message.revertedEventId || '');
+            message.resultVersionId = String(proposalEvent.resultVersionId || message.resultVersionId || '');
+            message.createdAt = String(proposalEvent.createdAt || message.createdAt || '');
+            message.applied = proposalStatus === 'applied' || proposalStatus === 'reverted';
+            message.reverted = proposalStatus === 'reverted';
+            if (proposalEvent.validationBefore && typeof proposalEvent.validationBefore === 'object') {
+                message.validationBefore = deepClone(proposalEvent.validationBefore);
+            }
+            if (proposalEvent.validationAfter && typeof proposalEvent.validationAfter === 'object') {
+                message.validation = deepClone(proposalEvent.validationAfter);
+            }
+            if (proposalEvent.draftBefore && typeof proposalEvent.draftBefore === 'object') {
+                message.draftBefore = deepClone(proposalEvent.draftBefore);
+            }
+            if (proposalEvent.draftAfter && typeof proposalEvent.draftAfter === 'object') {
+                message.draftAfter = deepClone(proposalEvent.draftAfter);
+            }
+            return message;
+        }
+
+        function getAiThreadStatusLabel(status) {
+            const proposalStatus = normalizeAiProposalStatus(status);
+            if (proposalStatus === 'applied') return 'Applied';
+            if (proposalStatus === 'dismissed') return 'Not applied';
+            if (proposalStatus === 'reverted') return 'Reverted';
+            if (proposalStatus === 'proposed') return 'Pending';
+            if (proposalStatus === 'error') return 'Error';
+            return '';
+        }
+
+        function buildAiEventIndex(events) {
+            return Object.fromEntries(
+                (Array.isArray(events) ? events : [])
+                    .map((event) => [String(event?.id || ''), event])
+                    .filter(([id]) => id)
+            );
+        }
+
+        function buildAiMessageFromHistoryEvent(event, eventIndex, selectedThread) {
+            const eventType = String(event?.eventType || '').trim();
+            const actorUserId = String(event?.actorUserId || '').trim();
+            const actorUsername = String(event?.actorUsername || '').trim();
+            const isViewerActor = actorUserId !== '' && actorUserId === getViewerId();
+            const appliedEvent = event?.appliedEventId ? eventIndex[String(event.appliedEventId)] : null;
+            const revertedEvent = event?.revertedEventId ? eventIndex[String(event.revertedEventId)] : null;
+            const commonMeta = {
+                id: event?.id || '',
+                actorUserId,
+                actorUsername,
+                createdAt: event?.createdAt || '',
+                eventType,
+                historyProjectId: event?.projectId || '',
+                historyThreadId: event?.threadId || '',
+                historyEventId: event?.id || '',
+                resultVersionId: event?.resultVersionId || '',
+            };
+
+            if (eventType === 'user-prompt') {
+                return createAiMessageRecord('user', event?.messageText || event?.promptText || '', {
+                    ...commonMeta,
+                    roleLabel: isViewerActor ? 'You' : (actorUsername || selectedThread?.ownerUsername || 'User'),
+                    draftBefore: event?.draftBefore || null,
+                    validationBefore: event?.validationBefore || null,
+                });
+            }
+
+            if (eventType === 'assistant-proposal') {
+                return createAiMessageRecord('assistant', event?.messageText || '', {
+                    ...commonMeta,
+                    roleLabel: 'Studio AI',
+                    title: event?.summary || 'Updated',
+                    notes: Array.isArray(event?.notes) ? event.notes : [],
+                    providerName: event?.providerName || '',
+                    modelName: event?.model || '',
+                    proposalStatus: event?.proposalStatus || '',
+                    appliedEventId: event?.appliedEventId || '',
+                    revertedEventId: event?.revertedEventId || '',
+                    appliedAt: appliedEvent?.createdAt || '',
+                    appliedByUsername: appliedEvent?.actorUsername || '',
+                    revertedAt: revertedEvent?.createdAt || '',
+                    revertedByUsername: revertedEvent?.actorUsername || '',
+                    validation: event?.validationAfter || null,
+                    validationBefore: event?.validationBefore || null,
+                    draftBefore: event?.draftBefore || null,
+                    draftAfter: event?.draftAfter || null,
+                });
+            }
+
+            if (eventType === 'assistant-error') {
+                return createAiMessageRecord('assistant', event?.messageText || 'The AI request failed.', {
+                    ...commonMeta,
+                    roleLabel: 'Studio AI',
+                    title: 'AI Error',
+                    providerName: event?.providerName || '',
+                    modelName: event?.model || '',
+                    proposalStatus: event?.proposalStatus || 'error',
+                    validationBefore: event?.validationBefore || null,
+                    draftBefore: event?.draftBefore || null,
+                });
+            }
+
+            const lifecycleTitle = {
+                apply: 'Applied',
+                dismiss: 'Not applied',
+                revert: 'History update',
+                save: 'Saved',
+                publish: 'Published',
+            }[eventType] || 'History update';
+
+            return createAiMessageRecord('assistant', event?.messageText || lifecycleTitle, {
+                ...commonMeta,
+                roleLabel: 'History',
+                title: lifecycleTitle,
+                validation: event?.validationAfter || null,
+                validationBefore: event?.validationBefore || null,
+                draftBefore: event?.draftBefore || null,
+                draftAfter: event?.draftAfter || null,
+            });
+        }
+
+        function setSelectedAiThreadState(threadId, persist = true) {
+            studioState.selectedAiThreadId = String(threadId || '').trim();
+            studioState.aiReadOnlyReason = getAiReadOnlyReason();
+            if (persist) {
+                persistStudioSelection();
+            }
+        }
+
+        function buildAiThreadList(history, project) {
+            const threads = Array.isArray(history?.threads) ? history.threads.map((thread) => deepClone(thread)) : [];
+            if (shouldIncludeViewerPlaceholderThread(threads, project)) {
+                threads.unshift(buildViewerPlaceholderThread(project));
+            }
+            return threads;
+        }
+
+        function resolveSelectedAiThreadId(threads, history, project, preferredThreadId = '') {
+            const normalizedPreferred = String(preferredThreadId || '').trim();
+            if (normalizedPreferred !== '') {
+                if (isViewerPlaceholderThreadId(normalizedPreferred)) {
+                    return normalizedPreferred;
+                }
+                if ((Array.isArray(threads) ? threads : []).some((thread) => String(thread?.id || '') === normalizedPreferred)) {
+                    return normalizedPreferred;
+                }
+            }
+
+            const viewerId = getViewerId();
+            const ownThread = (Array.isArray(threads) ? threads : []).find((thread) => String(thread?.ownerUserId || '') === viewerId);
+            if (ownThread) {
+                return String(ownThread.id || '');
+            }
+
+            if ((Array.isArray(threads) ? threads : []).some((thread) => isViewerPlaceholderThreadId(thread?.id || ''))) {
+                return viewerAiThreadId;
+            }
+
+            const historySelectedThreadId = String(history?.selectedThreadId || '').trim();
+            if (historySelectedThreadId !== '' && (Array.isArray(threads) ? threads : []).some((thread) => String(thread?.id || '') === historySelectedThreadId)) {
+                return historySelectedThreadId;
+            }
+
+            return String((threads[0]?.id) || '');
+        }
+
+        function applyAiHistoryToState(history, options = {}) {
+            const project = options.project || getSelectedProject() || null;
+            const preferredThreadId = options.selectedThreadId !== undefined
+                ? String(options.selectedThreadId || '').trim()
+                : getPersistedThreadId(studioState.type, project?.id || '');
+            const threads = buildAiThreadList(history, project);
+            const selectedThreadId = resolveSelectedAiThreadId(threads, history, project, preferredThreadId);
+            const selectedThread = threads.find((thread) => String(thread?.id || '') === selectedThreadId) || null;
+            const events = Array.isArray(history?.events) && selectedThread && !selectedThread.isPlaceholder
+                ? history.events
+                : [];
+            const eventIndex = buildAiEventIndex(events);
+
+            studioState.aiThreads = threads;
+            studioState.aiViewerPermissions = history?.viewerPermissions && typeof history.viewerPermissions === 'object'
+                ? history.viewerPermissions
+                : { canViewAllThreads: false, canRevertAny: false };
+            studioState.aiHistoryLoaded = true;
+            studioState.aiHistoryLoading = false;
+            studioState.aiMessages = events.map((event) => buildAiMessageFromHistoryEvent(event, eventIndex, selectedThread));
+            studioState.pendingAiDraftMessageId = '';
+            for (let index = studioState.aiMessages.length - 1; index >= 0; index -= 1) {
+                const message = studioState.aiMessages[index];
+                if (isPendingAiProposal(message)) {
+                    studioState.pendingAiDraftMessageId = String(message.id || '');
+                    break;
+                }
+            }
+            if (!studioState.pendingAiDraftMessageId && isViewerPlaceholderThreadId(selectedThreadId)) {
+                closeAiDiffModal();
+            }
+            setSelectedAiThreadState(selectedThreadId, options.persist !== false);
+            renderAiThreadTabs();
+            renderAiMessages();
+            renderAiComposerState();
+        }
+
+        function clearAiHistoryState(options = {}) {
+            studioState.aiThreads = [];
+            studioState.aiViewerPermissions = {
+                canViewAllThreads: false,
+                canRevertAny: false,
+            };
+            studioState.aiHistoryLoaded = !options.loading;
+            studioState.aiHistoryLoading = !!options.loading;
+            studioState.aiMessages = [];
+            studioState.pendingAiDraftMessageId = '';
+            setSelectedAiThreadState(options.selectedThreadId || '', options.persist !== false);
+            renderAiThreadTabs();
+            renderAiMessages();
+            renderAiComposerState();
+        }
+
+        async function loadAiHistoryForCurrentProject(preferredThreadId = '') {
+            const project = getSelectedProject();
+            const projectId = String(project?.id || '').trim();
+            const requestType = studioState.type;
+            if (!studioState.aiEnabled || projectId === '') {
+                clearAiHistoryState({
+                    selectedThreadId: '',
+                    persist: true,
+                });
+                return;
+            }
+
+            const requestId = (studioState.aiHistoryRequestId || 0) + 1;
+            studioState.aiHistoryRequestId = requestId;
+            clearAiHistoryState({
+                loading: true,
+                selectedThreadId: preferredThreadId || studioState.selectedAiThreadId,
+                persist: false,
+            });
+
+            try {
+                const requestedThreadId = String(preferredThreadId || getPersistedThreadId(studioState.type, projectId) || '').trim();
+                const result = await apiGet('list-ai-history', {
+                    type: studioState.type,
+                    projectId,
+                    ...(requestedThreadId && !isViewerPlaceholderThreadId(requestedThreadId) ? { threadId: requestedThreadId } : {}),
+                });
+
+                if (
+                    requestId !== studioState.aiHistoryRequestId
+                    || studioState.selectedProjectId !== projectId
+                    || studioState.type !== requestType
+                ) {
+                    return;
+                }
+
+                applyAiHistoryToState(result.history || null, {
+                    project: result.project || project,
+                    selectedThreadId: preferredThreadId || requestedThreadId,
+                });
+            } catch (error) {
+                if (
+                    requestId !== studioState.aiHistoryRequestId
+                    || studioState.selectedProjectId !== projectId
+                    || studioState.type !== requestType
+                ) {
+                    return;
+                }
+                studioState.aiHistoryLoaded = true;
+                studioState.aiHistoryLoading = false;
+                studioState.aiThreads = buildAiThreadList(null, project);
+                studioState.aiMessages = [];
+                studioState.pendingAiDraftMessageId = '';
+                setSelectedAiThreadState(resolveSelectedAiThreadId(studioState.aiThreads, null, project, preferredThreadId), true);
+                renderAiThreadTabs();
+                renderAiMessages();
+                renderAiComposerState();
+                editorStatusLineEl.textContent = error.message;
+            }
+        }
+
+        function getAiThreadDisplayName(thread) {
+            if (!thread) {
+                return 'AI History';
+            }
+            if (thread.isOwnedByViewer || isViewerPlaceholderThreadId(thread.id || '')) {
+                return getViewerUsername() || 'You';
+            }
+            return String(thread.ownerUsername || 'User').trim() || 'User';
+        }
+
+        function renderAiThreadTabs() {
+            if (!aiThreadTabsEl) {
+                return;
+            }
+
+            const project = getSelectedProject();
+            const threads = Array.isArray(studioState.aiThreads) ? studioState.aiThreads : [];
+            if (!studioState.aiEnabled || !project?.id) {
+                aiThreadTabsEl.innerHTML = '';
+                aiThreadTabsEl.hidden = true;
+                return;
+            }
+
+            if (!threads.length) {
+                aiThreadTabsEl.innerHTML = '';
+                aiThreadTabsEl.hidden = true;
+                return;
+            }
+
+            aiThreadTabsEl.hidden = false;
+            aiThreadTabsEl.innerHTML = threads.map((thread) => {
+                const statusLabel = thread.isPlaceholder ? 'No history' : getAiThreadStatusLabel(thread.latestProposalStatus || '');
+                const badgeClass = String(thread.latestProposalStatus || '').trim() || 'not-applied';
+                const isActive = String(thread.id || '') === String(studioState.selectedAiThreadId || '');
+                return `
+                    <button
+                        class="studio-ai-thread-tab ${isActive ? 'active' : ''}"
+                        type="button"
+                        data-ai-thread-id="${escapeHtml(thread.id || '')}"
+                    >
+                        <span class="studio-ai-thread-tab-name">${escapeHtml(getAiThreadDisplayName(thread))}</span>
+                        ${statusLabel ? `<span class="studio-ai-thread-tab-badge ${escapeHtml(badgeClass === 'dismissed' ? 'not-applied' : badgeClass)}">${escapeHtml(statusLabel)}</span>` : ''}
+                    </button>
+                `;
+            }).join('');
+
+            aiThreadTabsEl.querySelectorAll('[data-ai-thread-id]').forEach((button) => {
+                button.addEventListener('click', async () => {
+                    const threadId = String(button.getAttribute('data-ai-thread-id') || '').trim();
+                    if (!threadId || threadId === String(studioState.selectedAiThreadId || '')) {
+                        return;
+                    }
+
+                    if (isViewerPlaceholderThreadId(threadId)) {
+                        clearAiHistoryState({
+                            selectedThreadId: threadId,
+                            persist: true,
+                        });
+                        return;
+                    }
+
+                    await loadAiHistoryForCurrentProject(threadId);
+                });
+            });
+        }
+
+        function renderAiComposerState() {
+            const readOnlyReason = getAiReadOnlyReason();
+            studioState.aiReadOnlyReason = readOnlyReason;
+            if (aiHistoryNoticeEl) {
+                const selectedThread = getSelectedAiThread();
+                const label = readOnlyReason
+                    ? readOnlyReason
+                    : (selectedThread && !isViewerPlaceholderThreadId(selectedThread.id || '')
+                        ? `Live thread for ${getAiThreadDisplayName(selectedThread)}.`
+                        : 'Live thread. Ask AI to start your history on this project.');
+                aiHistoryNoticeEl.hidden = !label;
+                aiHistoryNoticeEl.classList.toggle('readonly', !!readOnlyReason);
+                aiHistoryNoticeEl.textContent = label;
+            }
+
+            if (aiChatFormEl) {
+                aiChatFormEl.classList.toggle('is-readonly', !!readOnlyReason);
+            }
+            if (aiPromptEl) {
+                aiPromptEl.disabled = !!readOnlyReason || studioState.aiActionBusy;
+                aiPromptEl.placeholder = readOnlyReason || (
+                    studioState.type === 'template'
+                        ? 'Ask AI to create or edit this template.'
+                        : 'Ask AI to create or edit this workflow.'
+                );
+            }
+            if (generateAiBtn) {
+                generateAiBtn.disabled = !!readOnlyReason || studioState.aiActionBusy || studioState.aiProviders.length === 0;
+            }
+            if (aiComposerHelperEl) {
+                aiComposerHelperEl.textContent = readOnlyReason || 'AI proposes changes here. Review them before applying to the project.';
+            }
+            if (clearAiChatBtn) {
+                clearAiChatBtn.textContent = studioState.selectedProjectId ? 'Reload' : 'Clear';
+            }
+        }
+
+        function getAiProposalStatusLabel(message) {
+            const proposalStatus = normalizeAiProposalStatus(message?.proposalStatus);
+            if (proposalStatus === 'applied') {
+                return 'Applied';
+            }
+            if (proposalStatus === 'dismissed') {
+                return 'Not applied';
+            }
+            if (proposalStatus === 'reverted') {
+                return 'Reverted';
+            }
+            if (proposalStatus === 'proposed') {
+                return 'Pending';
+            }
+            if (message?.applied && !message?.reverted) {
+                return 'Applied';
+            }
+            if (message?.reverted) {
+                return 'Reverted';
+            }
+            return '';
+        }
+
+        function syncAiProjectFromServer(type, project) {
+            if (!project || typeof project !== 'object' || type !== studioState.type) {
+                return;
+            }
+
+            mergeAiProjectIntoState(type, project);
+            loadDraft(project);
+        }
+
+        async function runAiActionWithConflictRetry(action, payload, conflictMessage) {
+            try {
+                return await apiPost(action, payload);
+            } catch (error) {
+                if (error?.data?.code === 'draft_conflict' && !payload.force) {
+                    if (!window.confirm(conflictMessage)) {
+                        return null;
+                    }
+                    return apiPost(action, {
+                        ...payload,
+                        force: true,
+                    });
+                }
+                throw error;
+            }
         }
 
         function normalizeDraftForDiff(value) {
@@ -5306,6 +6108,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
 
         function getAiConversationForRequest() {
             return (Array.isArray(studioState.aiMessages) ? studioState.aiMessages : [])
+                .filter((message) => !['apply', 'dismiss', 'revert', 'save', 'publish'].includes(String(message?.eventType || '').trim()))
                 .slice(-6)
                 .map((message) => ({
                     role: message.role === 'assistant' ? 'assistant' : 'user',
@@ -5314,8 +6117,15 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 .filter((message) => message.content);
         }
 
-        function getPendingAiDiffData() {
-            const message = getPendingAiDraftMessage();
+        function getAiDiffTargetMessage() {
+            const explicitMessage = getAiMessageById(studioState.aiDiffMessageId || '');
+            if (explicitMessage && explicitMessage.draftAfter && typeof explicitMessage.draftAfter === 'object') {
+                return explicitMessage;
+            }
+            return getPendingAiDraftMessage();
+        }
+
+        function buildAiDiffDataForMessage(message) {
             if (!message) {
                 return null;
             }
@@ -5349,6 +6159,14 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             };
         }
 
+        function getPendingAiDiffData() {
+            return buildAiDiffDataForMessage(getPendingAiDraftMessage());
+        }
+
+        function getCurrentAiDiffData() {
+            return buildAiDiffDataForMessage(getAiDiffTargetMessage());
+        }
+
         function renderAiMessages() {
             if (!aiMessagesEl) {
                 renderAiPlan();
@@ -5359,6 +6177,17 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             if (!messages.length) {
                 if (!studioState.aiEnabled) {
                     aiMessagesEl.innerHTML = '<div class="studio-ai-empty">Studio AI is disabled for this account.</div>';
+                    renderAiPlan();
+                    return;
+                }
+                if (studioState.aiHistoryLoading && studioState.selectedProjectId) {
+                    aiMessagesEl.innerHTML = '<div class="studio-ai-empty">Loading AI history…</div>';
+                    renderAiPlan();
+                    return;
+                }
+                const selectedThread = getSelectedAiThread();
+                if (selectedThread && isViewerPlaceholderThreadId(selectedThread.id || '')) {
+                    aiMessagesEl.innerHTML = '<div class="studio-ai-empty">Your thread has no history yet on this project. Ask AI to start it.</div>';
                     renderAiPlan();
                     return;
                 }
@@ -5375,21 +6204,21 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 const metaParts = [];
                 if (message.providerName) metaParts.push(message.providerName);
                 if (message.modelName) metaParts.push(message.modelName);
-                if (message.applied && !message.reverted) metaParts.push('Applied to editor');
+                if (message.eventType === 'assistant-proposal' && message.actorUsername) metaParts.push(`Asked by ${message.actorUsername}`);
+                if (['apply', 'dismiss', 'revert', 'save', 'publish'].includes(String(message.eventType || '')) && message.actorUsername) metaParts.push(`By ${message.actorUsername}`);
+                const proposalStatusLabel = getAiProposalStatusLabel(message);
+                if (proposalStatusLabel) metaParts.push(proposalStatusLabel);
+                if (message.createdAt) metaParts.push(formatDate(message.createdAt));
+                if (message.appliedAt) metaParts.push(`Applied ${formatDate(message.appliedAt)}`);
+                if (message.revertedAt) metaParts.push(`Reverted ${formatDate(message.revertedAt)}`);
 
                 return `
                     <div class="studio-ai-message ${escapeHtml(message.role)}">
-                        <div class="studio-ai-message-role">${escapeHtml(message.role === 'assistant' ? 'Studio AI' : 'You')}</div>
+                        <div class="studio-ai-message-role">${escapeHtml(message.roleLabel || (message.role === 'assistant' ? 'Studio AI' : 'You'))}</div>
                         <div class="studio-ai-bubble">
-                            ${message.title ? `<div class="studio-ai-title">${escapeHtml(message.title)}</div>` : ''}
-                            <div>${escapeHtml(message.content || '')}</div>
-                            ${notes.length ? `<ul class="studio-ai-notes">${notes.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}</ul>` : ''}
-                            ${validationHtml}
-                            ${versionHtml}
-                            ${metaParts.length ? `<div class="studio-ai-meta">${escapeHtml(metaParts.join(' · '))}</div>` : ''}
+                            ${message.title ? `<div class="studio-ai-title">${escapeHtml(message.title)}</div>` : ''}${message.content ? `<div class="studio-ai-content">${escapeHtml(message.content || '')}</div>` : ''}${notes.length ? `<ul class="studio-ai-notes">${notes.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}</ul>` : ''}${validationHtml}${versionHtml}${metaParts.length ? `<div class="studio-ai-meta">${escapeHtml(metaParts.join(' · '))}</div>` : ''}
                         </div>
                         ${actionHtml}
-                        ${message.reverted ? '<div class="studio-ai-actions"><span class="studio-ai-flag reverted"><i class="fas fa-rotate-left"></i> Reverted</span></div>' : ''}
                     </div>
                 `;
             }).join('');
@@ -5453,15 +6282,35 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
 
             (Array.isArray(message.actions) ? message.actions : []).forEach((action) => addAction(action));
 
-            if (message.role === 'assistant' && message.applied && !message.reverted && message.draftBefore) {
+            if (message.role === 'assistant' && message.draftBefore && message.draftAfter && message.eventType === 'assistant-proposal') {
+                addAction({
+                    kind: 'view-ai-diff',
+                    label: 'View Diff',
+                });
+            }
+
+            if (
+                message.role === 'assistant'
+                && message.applied
+                && !message.reverted
+                && message.draftBefore
+                && (isSelectedAiThreadOwnedByViewer() || !!studioState.aiViewerPermissions?.canRevertAny)
+            ) {
                 addAction({
                     kind: 'revert-ai-draft',
                     label: 'Revert',
                 });
             }
 
+            if (canRestoreSelectedAiThreadCheckpoint(message)) {
+                addAction({
+                    kind: 'restore-ai-checkpoint',
+                    label: 'Go back to this point',
+                });
+            }
+
             const validation = message.validation && typeof message.validation === 'object' ? message.validation : null;
-            if (studioState.type === 'workflow' && validation && !message.applied) {
+            if (studioState.type === 'workflow' && validation && isPendingAiProposal(message)) {
                 const gaps = Array.isArray(validation.capabilityGaps) ? validation.capabilityGaps : [];
                 gaps.forEach((gap) => {
                     const capability = String(gap?.capability || '').trim();
@@ -5480,8 +6329,18 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
         }
 
         async function handleAiMessageAction(kind, payload = {}) {
+            if (kind === 'view-ai-diff') {
+                openAiDiffModal('raw', String(payload.messageId || ''));
+                return;
+            }
+
             if (kind === 'revert-ai-draft') {
                 await revertAiDraftMessage(String(payload.messageId || ''));
+                return;
+            }
+
+            if (kind === 'restore-ai-checkpoint') {
+                await restoreAiCheckpointMessage(String(payload.messageId || ''));
                 return;
             }
 
@@ -5514,6 +6373,9 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 aiPlanNotesEl.style.display = 'none';
                 if (aiPlanLintBoxEl) aiPlanLintBoxEl.style.display = 'none';
                 if (aiPlanLintListEl) aiPlanLintListEl.innerHTML = '';
+                aiClearPlanBtn.innerHTML = '<i class="fas fa-xmark"></i> Clear';
+                aiApplyBtn.hidden = false;
+                aiClearPlanBtn.hidden = false;
                 aiViewDiffBtn.disabled = true;
                 aiSmartDiffBtn.disabled = true;
                 aiApplyBtn.disabled = true;
@@ -5573,10 +6435,17 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
 
             const noChanges = stats.additions === 0 && stats.deletions === 0;
             const smartDiffAvailable = studioState.type === 'workflow' && Number(diffData.smartData?.summary?.total || 0) > 0;
+            const canApply = canApplyAiProposalMessage(diffData.message);
+            const canDismiss = canDismissAiProposalMessage(diffData.message);
+            aiClearPlanBtn.innerHTML = diffData.message?.historyEventId
+                ? '<i class="fas fa-xmark"></i> Dismiss'
+                : '<i class="fas fa-xmark"></i> Clear';
             aiViewDiffBtn.disabled = studioState.aiActionBusy || noChanges;
             aiSmartDiffBtn.disabled = studioState.aiActionBusy || !smartDiffAvailable;
-            aiApplyBtn.disabled = studioState.aiActionBusy;
-            aiClearPlanBtn.disabled = studioState.aiActionBusy;
+            aiApplyBtn.hidden = !canApply;
+            aiClearPlanBtn.hidden = diffData.message?.historyEventId ? !canDismiss : false;
+            aiApplyBtn.disabled = studioState.aiActionBusy || !canApply;
+            aiClearPlanBtn.disabled = studioState.aiActionBusy || (!canDismiss && !!diffData.message?.historyEventId);
         }
 
         function renderAiDiffModal() {
@@ -5584,7 +6453,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 return;
             }
 
-            const diffData = getPendingAiDiffData();
+            const diffData = getCurrentAiDiffData();
             if (!diffData) {
                 aiDiffFilesEl.innerHTML = '<div class="studio-diff-empty">No pending changes.</div>';
                 aiDiffMetaEl.innerHTML = `
@@ -5594,6 +6463,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                     </div>
                 `;
                 aiDiffContentEl.innerHTML = '<div class="studio-diff-empty">No pending changes.</div>';
+                aiDiffApplyBtn.hidden = false;
                 aiDiffApplyBtn.disabled = true;
                 return;
             }
@@ -5639,11 +6509,13 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                     renderAiDiffModal();
                 });
             });
-            aiDiffApplyBtn.disabled = studioState.aiActionBusy;
+            const canApply = canApplyAiProposalMessage(diffData.message);
+            aiDiffApplyBtn.hidden = !canApply;
+            aiDiffApplyBtn.disabled = studioState.aiActionBusy || !canApply;
         }
 
-        function openAiDiffModal(mode = 'raw') {
-            const message = getPendingAiDraftMessage();
+        function openAiDiffModal(mode = 'raw', messageId = '') {
+            const message = messageId ? getAiMessageById(messageId) : getPendingAiDraftMessage();
             if (!message || !aiDiffModalEl) {
                 return;
             }
@@ -5659,10 +6531,61 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             studioState.aiDiffMode = 'raw';
         }
 
-        function clearAiPendingChange() {
-            studioState.pendingAiDraftMessageId = '';
-            closeAiDiffModal();
+        async function clearAiPendingChange() {
+            const message = getPendingAiDraftMessage();
+            if (!message) {
+                studioState.pendingAiDraftMessageId = '';
+                closeAiDiffModal();
+                renderAiPlan();
+                return;
+            }
+
+            const projectId = String(message.historyProjectId || studioState.selectedProjectId || '');
+            if (!message.historyEventId || !message.historyThreadId || !projectId) {
+                studioState.pendingAiDraftMessageId = '';
+                closeAiDiffModal();
+                renderAiPlan();
+                return;
+            }
+
+            if (!window.confirm('Dismiss this AI proposal? It will remain in history as not applied.')) {
+                return;
+            }
+
+            studioState.aiActionBusy = true;
+            renderAiMessages();
             renderAiPlan();
+            renderAiDiffModal();
+
+            try {
+                const result = await apiPost('dismiss-ai-proposal', {
+                    type: studioState.type,
+                    projectId,
+                    threadId: message.historyThreadId,
+                    eventId: message.historyEventId,
+                });
+                if (result.history && studioState.type) {
+                    applyAiHistoryToState(result.history, {
+                        project: result.project || getSelectedProject(),
+                        selectedThreadId: message.historyThreadId,
+                    });
+                } else {
+                    syncAiProposalMessageFromEvent(message, result.proposalEvent || null);
+                    studioState.pendingAiDraftMessageId = '';
+                }
+                closeAiDiffModal();
+                editorStatusLineEl.textContent = 'Dismissed the AI proposal.';
+                window.Toast?.success?.('Proposal dismissed');
+            } catch (error) {
+                editorStatusLineEl.textContent = error.message;
+                window.Toast?.error?.(error.message);
+                throw error;
+            } finally {
+                studioState.aiActionBusy = false;
+                renderAiMessages();
+                renderAiPlan();
+                renderAiDiffModal();
+            }
         }
 
         async function applyAiPlan() {
@@ -5682,26 +6605,53 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 }
             }
 
+            const projectId = String(message.historyProjectId || studioState.selectedProjectId || '');
+            const canPersistApply = !!(message.historyEventId && message.historyThreadId && projectId);
+
             studioState.aiActionBusy = true;
             renderAiMessages();
             renderAiPlan();
             renderAiDiffModal();
 
             try {
-                applyDraftToEditor(message.draftAfter, message.validation || null);
-                appendAiMessage('assistant', 'Applied AI changes.', {
-                    providerName: message.providerName,
-                    modelName: message.modelName,
-                    applied: true,
-                    validation: message.validation || null,
-                    validationBefore: message.validationBefore || null,
-                    draftBefore: message.draftBefore || null,
-                    draftAfter: message.draftAfter || null,
-                });
+                if (!canPersistApply) {
+                    applyDraftToEditor(message.draftAfter, message.validation || null);
+                    message.applied = true;
+                    message.proposalStatus = 'applied';
+                } else {
+                    const result = await runAiActionWithConflictRetry(
+                        'apply-ai-proposal',
+                        {
+                            type: studioState.type,
+                            projectId,
+                            threadId: message.historyThreadId,
+                            eventId: message.historyEventId,
+                        },
+                        'This project changed since the AI proposal was created. Apply the proposal anyway and replace the current saved draft?'
+                    );
+                    if (!result) {
+                        return;
+                    }
+                    syncAiProjectFromServer(studioState.type, result.project || null);
+                    if (result.history) {
+                        applyAiHistoryToState(result.history, {
+                            project: result.project || getSelectedProject(),
+                            selectedThreadId: message.historyThreadId,
+                        });
+                    } else {
+                        syncAiProposalMessageFromEvent(message, result.proposalEvent || null);
+                    }
+                }
                 studioState.pendingAiDraftMessageId = '';
                 closeAiDiffModal();
-                editorStatusLineEl.textContent = 'Applied AI changes to the editor. Review them, then save when you are happy.';
+                editorStatusLineEl.textContent = canPersistApply
+                    ? 'Applied AI changes to the project draft.'
+                    : 'Applied AI changes to the editor. Review them, then save when you are happy.';
                 window.Toast?.success?.('Applied AI changes');
+            } catch (error) {
+                editorStatusLineEl.textContent = error.message;
+                window.Toast?.error?.(error.message);
+                throw error;
             } finally {
                 studioState.aiActionBusy = false;
                 renderAiMessages();
@@ -5726,23 +6676,113 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 return;
             }
 
+            const projectId = String(message.historyProjectId || studioState.selectedProjectId || '');
+            const canPersistRevert = !!(message.historyEventId && message.historyThreadId && projectId);
+
             studioState.aiActionBusy = true;
             renderAiMessages();
             renderAiPlan();
 
             try {
-                applyDraftToEditor(message.draftBefore, message.validationBefore || null);
-                message.reverted = true;
-                appendAiMessage('assistant', 'Reverted AI changes.', {
-                    providerName: message.providerName,
-                    modelName: message.modelName,
-                });
-                editorStatusLineEl.textContent = 'Reverted the applied AI changes.';
+                if (!canPersistRevert) {
+                    applyDraftToEditor(message.draftBefore, message.validationBefore || null);
+                    message.reverted = true;
+                    message.proposalStatus = 'reverted';
+                } else {
+                    const result = await runAiActionWithConflictRetry(
+                        'revert-ai-checkpoint',
+                        {
+                            type: studioState.type,
+                            projectId,
+                            threadId: message.historyThreadId,
+                            eventId: message.historyEventId,
+                            target: 'before',
+                        },
+                        'This project changed since those AI changes were applied. Revert this checkpoint anyway and replace the current saved draft?'
+                    );
+                    if (!result) {
+                        return;
+                    }
+                    syncAiProjectFromServer(studioState.type, result.project || null);
+                    if (result.history) {
+                        applyAiHistoryToState(result.history, {
+                            project: result.project || getSelectedProject(),
+                            selectedThreadId: message.historyThreadId,
+                        });
+                    } else {
+                        syncAiProposalMessageFromEvent(message, result.proposalEvent || null);
+                    }
+                }
+                editorStatusLineEl.textContent = canPersistRevert
+                    ? 'Reverted the AI checkpoint and restored the project draft.'
+                    : 'Reverted the applied AI changes.';
                 window.Toast?.success?.('Reverted AI changes');
+            } catch (error) {
+                editorStatusLineEl.textContent = error.message;
+                window.Toast?.error?.(error.message);
+                throw error;
             } finally {
                 studioState.aiActionBusy = false;
                 renderAiMessages();
                 renderAiPlan();
+            }
+        }
+
+        async function restoreAiCheckpointMessage(messageId) {
+            const message = getAiMessageById(messageId);
+            if (!canRestoreSelectedAiThreadCheckpoint(message)) {
+                return;
+            }
+
+            const projectId = String(message.historyProjectId || studioState.selectedProjectId || '');
+            if (!projectId || !message.historyThreadId || !message.historyEventId) {
+                return;
+            }
+
+            const confirmMessage = 'Restore the project draft to the state immediately after this AI change was applied?';
+            if (!window.confirm(confirmMessage)) {
+                return;
+            }
+
+            studioState.aiActionBusy = true;
+            renderAiMessages();
+            renderAiPlan();
+            renderAiDiffModal();
+
+            try {
+                const result = await runAiActionWithConflictRetry(
+                    'revert-ai-checkpoint',
+                    {
+                        type: studioState.type,
+                        projectId,
+                        threadId: message.historyThreadId,
+                        eventId: message.historyEventId,
+                        target: 'after',
+                    },
+                    'This project changed since that checkpoint. Restore this point anyway and replace the current saved draft?'
+                );
+                if (!result) {
+                    return;
+                }
+                syncAiProjectFromServer(studioState.type, result.project || null);
+                if (result.history) {
+                    applyAiHistoryToState(result.history, {
+                        project: result.project || getSelectedProject(),
+                        selectedThreadId: message.historyThreadId,
+                    });
+                }
+                closeAiDiffModal();
+                editorStatusLineEl.textContent = 'Restored the project draft to the selected AI checkpoint.';
+                window.Toast?.success?.('Checkpoint restored');
+            } catch (error) {
+                editorStatusLineEl.textContent = error.message;
+                window.Toast?.error?.(error.message);
+                throw error;
+            } finally {
+                studioState.aiActionBusy = false;
+                renderAiMessages();
+                renderAiPlan();
+                renderAiDiffModal();
             }
         }
 
@@ -5825,20 +6865,24 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
 
             setBusy(true, 'Saving...');
             try {
+                const selectedThreadId = !isViewerPlaceholderThreadId(studioState.selectedAiThreadId || '')
+                    ? String(studioState.selectedAiThreadId || '')
+                    : '';
                 const result = await apiPost('save-project', {
                     type: studioState.type,
                     projectId: studioState.selectedProjectId,
                     payload,
+                    ...(selectedThreadId ? { threadId: selectedThreadId } : {}),
                 });
                 studioState.currentValidation = result.project?.lastValidation || null;
                 studioState.isDirty = false;
                 await refreshData(result.project?.id || '');
-                appendAiMessage('assistant', `Saved the current ${studioState.type}.`, {
-                    title: 'Saved',
-                    validation: studioState.currentValidation,
-                    versions: getSelectedProject()?.versions || [],
-                });
-                renderAiMessages();
+                if (result.history) {
+                    applyAiHistoryToState(result.history, {
+                        project: getSelectedProject() || result.project || null,
+                        selectedThreadId,
+                    });
+                }
                 editorStatusLineEl.textContent = `${studioState.type === 'template' ? 'Template' : 'Workflow'} saved.`;
                 window.Toast?.success?.('Saved');
             } catch (error) {
@@ -5892,9 +6936,13 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
 
             setBusy(true, 'Publishing...');
             try {
+                const selectedThreadId = !isViewerPlaceholderThreadId(studioState.selectedAiThreadId || '')
+                    ? String(studioState.selectedAiThreadId || '')
+                    : '';
                 const result = await apiPost('publish-project', {
                     type: studioState.type,
                     projectId: studioState.selectedProjectId,
+                    ...(selectedThreadId ? { threadId: selectedThreadId } : {}),
                 });
                 studioState.currentValidation = result.validation || null;
                 await refreshData(result.project?.id || studioState.selectedProjectId);
@@ -5904,13 +6952,29 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                         label: `Return and continue ${studioState.pendingWorkflowResume.name || 'workflow'}`,
                     }]
                     : [];
-                appendAiMessage('assistant', `Published the current ${studioState.type} to runtime.`, {
-                    title: 'Published',
-                    validation: studioState.currentValidation,
-                    versions: getSelectedProject()?.versions || [],
-                    actions: postPublishActions,
-                });
-                renderAiMessages();
+                if (result.history) {
+                    applyAiHistoryToState(result.history, {
+                        project: getSelectedProject() || result.project || null,
+                        selectedThreadId,
+                    });
+                    if (postPublishActions.length) {
+                        const publishMessage = [...studioState.aiMessages]
+                            .reverse()
+                            .find((message) => String(message?.eventType || '') === 'publish');
+                        if (publishMessage) {
+                            publishMessage.actions = postPublishActions;
+                            renderAiMessages();
+                        }
+                    }
+                } else if (postPublishActions.length) {
+                    appendAiMessage('assistant', `Published the current ${studioState.type} to runtime.`, {
+                        title: 'Published',
+                        validation: studioState.currentValidation,
+                        versions: getSelectedProject()?.versions || [],
+                        actions: postPublishActions,
+                    });
+                    renderAiMessages();
+                }
                 editorStatusLineEl.textContent = `${studioState.type === 'template' ? 'Template' : 'Workflow'} published to runtime.`;
                 window.Toast?.success?.('Published');
             } catch (error) {
@@ -6035,6 +7099,9 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             const editMode = typeof options.editMode === 'boolean'
                 ? options.editMode
                 : (!!studioState.selectedProjectId || conversation.some((message) => message.role === 'assistant'));
+            const projectPayload = isPlainObject(options.projectPayload)
+                ? deepClone(options.projectPayload)
+                : buildProjectPayloadForAiRequest(type, currentDraft);
 
             appendAiMessage('user', displayPrompt);
             renderAiMessages();
@@ -6049,6 +7116,9 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                     type,
                     providerId: aiProviderSelectEl?.value || '',
                     prompt,
+                    displayPrompt,
+                    projectId: type === studioState.type ? studioState.selectedProjectId : '',
+                    projectPayload,
                     currentDraft,
                     conversation,
                     currentValidation,
@@ -6056,21 +7126,44 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 });
 
                 studioState.lastAiResult = result;
+                if (result.project && type === studioState.type) {
+                    mergeAiProjectIntoState(type, result.project);
+                }
+                if (result.history && type === studioState.type) {
+                    applyAiHistoryToState(result.history, {
+                        project: result.project || getSelectedProject(),
+                        selectedThreadId: result.threadId || result.thread?.id || '',
+                    });
+                    closeAiDiffModal();
+                    editorStatusLineEl.textContent = String(options.successStatus || 'AI proposed changes. Review them in Pending Changes, then apply them to the project if you want to keep them.');
+                    window.Toast?.success?.(String(options.successToast || 'AI update ready'));
+                    return result;
+                }
                 const extraNotes = Array.isArray(options.extraNotes) ? options.extraNotes : [];
+                const historyEvent = result.historyEvent && typeof result.historyEvent === 'object' ? result.historyEvent : {};
 
                 const aiMessage = appendAiMessage('assistant', result.reply || `I updated the ${type}.`, {
                     title: result.summary || 'Updated',
                     notes: [...(result.notes || []), ...extraNotes],
                     providerName: result.provider?.name || options.fallbackProviderName || 'AI',
                     modelName: result.model || '',
+                    eventType: historyEvent.eventType || 'assistant-proposal',
+                    historyProjectId: result.projectId || result.project?.id || '',
+                    historyThreadId: result.threadId || result.thread?.id || '',
+                    historyEventId: historyEvent.id || '',
+                    proposalStatus: historyEvent.proposalStatus || 'proposed',
+                    appliedEventId: historyEvent.appliedEventId || '',
+                    revertedEventId: historyEvent.revertedEventId || '',
+                    resultVersionId: historyEvent.resultVersionId || '',
+                    createdAt: historyEvent.createdAt || '',
                     applied: false,
                     reverted: false,
-                    validation: result.validation || null,
-                    validationBefore: currentValidation,
+                    validation: historyEvent.validationAfter || result.validation || null,
+                    validationBefore: historyEvent.validationBefore || currentValidation,
                     versions: getSelectedProject()?.versions || [],
                     actions: Array.isArray(options.actions) ? options.actions : [],
-                    draftBefore: currentDraft,
-                    draftAfter: result.draft || {},
+                    draftBefore: historyEvent.draftBefore || currentDraft,
+                    draftAfter: historyEvent.draftAfter || result.draft || {},
                 });
                 studioState.pendingAiDraftMessageId = aiMessage?.draftAfter ? String(aiMessage.id || '') : '';
                 closeAiDiffModal();
@@ -6080,8 +7173,31 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 window.Toast?.success?.(String(options.successToast || 'AI update ready'));
                 return result;
             } catch (error) {
+                if (error.data?.project && type === studioState.type) {
+                    mergeAiProjectIntoState(type, error.data.project);
+                }
+                if (error.data?.history && type === studioState.type) {
+                    applyAiHistoryToState(error.data.history, {
+                        project: error.data.project || getSelectedProject(),
+                        selectedThreadId: error.data.threadId || error.data.thread?.id || '',
+                    });
+                    renderAiMessages();
+                    renderAiPlan();
+                    editorStatusLineEl.textContent = error.message;
+                    window.Toast?.error?.(error.message);
+                    throw error;
+                }
+                const historyEvent = error.data?.historyEvent && typeof error.data.historyEvent === 'object' ? error.data.historyEvent : {};
                 appendAiMessage('assistant', `I hit an error: ${error.message}`, {
+                    eventType: historyEvent.eventType || 'assistant-error',
+                    historyProjectId: error.data?.projectId || error.data?.project?.id || '',
+                    historyThreadId: error.data?.threadId || error.data?.thread?.id || '',
+                    historyEventId: historyEvent.id || '',
+                    proposalStatus: historyEvent.proposalStatus || 'error',
+                    createdAt: historyEvent.createdAt || '',
                     providerName: aiProviderSelectEl?.selectedOptions?.[0]?.textContent?.trim() || options.fallbackProviderName || 'AI',
+                    validationBefore: historyEvent.validationBefore || currentValidation,
+                    draftBefore: historyEvent.draftBefore || currentDraft,
                 });
                 renderAiMessages();
                 renderAiPlan();
@@ -6093,9 +7209,64 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             }
         }
 
+        function buildProjectPayloadForAiRequest(type, currentDraft) {
+            if (type === studioState.type) {
+                const payload = buildPayloadFromEditor();
+                if (payload) {
+                    return payload;
+                }
+            }
+
+            const draft = currentDraft && typeof currentDraft === 'object'
+                ? deepClone(currentDraft)
+                : {};
+            const payload = {
+                name: String(draft.name || '').trim(),
+                description: String(draft.description || '').trim(),
+                draft,
+                status: getSelectedProject()?.status || 'draft',
+            };
+
+            if (type === 'template') {
+                payload.templateId = String(draft.id || '').trim();
+                payload.sourceType = sourceTypeEl?.value || 'local';
+            } else {
+                payload.commandId = String(draft.id || '').trim();
+            }
+
+            return payload;
+        }
+
+        function mergeAiProjectIntoState(type, project) {
+            if (!project || typeof project !== 'object' || !project.id || type !== studioState.type) {
+                return;
+            }
+
+            const key = type === 'template' ? 'template' : 'workflow';
+            const nextProjects = Array.isArray(studioState.data[key]) ? studioState.data[key].slice() : [];
+            const nextProject = deepClone(project);
+            const existingIndex = nextProjects.findIndex((item) => item.id === nextProject.id);
+            if (existingIndex >= 0) {
+                nextProjects.splice(existingIndex, 1);
+            }
+            nextProjects.unshift(nextProject);
+            studioState.data[key] = nextProjects;
+            studioState.selectedProjectId = nextProject.id;
+            updateStats();
+            renderProjectList();
+            archiveBtn.disabled = false;
+            persistStudioSelection();
+        }
+
         async function generateAiDraft() {
             if (!studioState.aiEnabled) {
                 editorStatusLineEl.textContent = 'Studio AI is disabled for this account.';
+                return;
+            }
+
+            if (!canComposeInCurrentAiContext()) {
+                editorStatusLineEl.textContent = studioState.aiReadOnlyReason || 'This AI thread is read-only.';
+                window.Toast?.error?.(studioState.aiReadOnlyReason || 'This AI thread is read-only');
                 return;
             }
 
@@ -6127,7 +7298,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                     currentValidation: studioState.currentValidation || null,
                     editMode,
                     busyText: 'Updating with AI...',
-                    successStatus: 'AI updated the editor. Review it, then save when you are happy.',
+                    successStatus: 'AI proposed changes. Review them in the history, then apply them if you want to keep them.',
                     successToast: 'AI update ready',
                     fallbackProviderName: 'AI',
                 });
@@ -6148,7 +7319,8 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             updateStats();
             renderProjectList();
 
-            const targetProject = getProjects().find((project) => project.id === selectProjectId);
+            const desiredProjectId = String(selectProjectId || getPersistedProjectId(studioState.type) || '').trim();
+            const targetProject = getProjects().find((project) => project.id === desiredProjectId) || getProjects()[0] || null;
             if (targetProject) {
                 loadDraft(targetProject);
                 return;
@@ -6607,6 +7779,7 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
                 editorStatusLineEl.textContent = message;
                 useStatusLineEl.textContent = message;
             }
+            renderAiComposerState();
         }
 
         function markDirty() {
@@ -6622,8 +7795,18 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             editorStatusBadgeEl.textContent = formatProjectStatus(normalized);
         }
 
-        async function apiGet(action) {
-            const response = await fetch(`../api/studio-workflows.php?action=${encodeURIComponent(action)}`, {
+        async function apiGet(action, params = {}) {
+            const query = new URLSearchParams({
+                action: String(action || ''),
+            });
+            Object.entries(params && typeof params === 'object' ? params : {}).forEach(([key, value]) => {
+                if (value === undefined || value === null || value === '') {
+                    return;
+                }
+                query.set(key, String(value));
+            });
+
+            const response = await fetch(`../api/studio-workflows.php?${query.toString()}`, {
                 credentials: 'same-origin',
             });
             const data = await response.json();
@@ -7069,9 +8252,14 @@ $initialStudioStateJson = json_encode($initialStudioState, JSON_HEX_TAG | JSON_H
             return raw;
         }
 
+        studioState.type = getPersistedStudioType();
+        document.querySelectorAll('[data-type-tab]').forEach((button) => {
+            button.classList.toggle('active', (button.dataset.typeTab || 'workflow') === studioState.type);
+        });
         renderProjectList();
-        const firstProject = getProjects()[0] || null;
-        loadDraft(firstProject);
+        const initialProjectId = getPersistedProjectId(studioState.type);
+        const initialProject = getProjects().find((project) => project.id === initialProjectId) || getProjects()[0] || null;
+        loadDraft(initialProject);
     </script>
 </body>
 </html>
