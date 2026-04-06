@@ -1,4 +1,5 @@
 # Doki
+### *Create Apps and Workflows by asking AI! and do a lot more...*
 
 Doki is a local-first workspace for running operational workflows, managing Docker-backed tools, and composing internal utilities in one place.
 
