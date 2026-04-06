@@ -122,7 +122,7 @@ class WorkflowStudioManager {
                 throw new RuntimeException('Workflow project could not be loaded after save');
             }
 
-            $this->createVersion($projectId, 'manual-save', $payload['draft'], null, $userId);
+            $versionId = $this->createVersion($projectId, 'manual-save', $payload['draft'], null, $userId);
             $this->db->commit();
 
             $updated = $this->getProject($projectId);
@@ -137,7 +137,7 @@ class WorkflowStudioManager {
                 );
             }
 
-            return ['success' => true, 'project' => $updated];
+            return ['success' => true, 'project' => $updated, 'versionId' => $versionId];
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
@@ -317,7 +317,7 @@ class WorkflowStudioManager {
                 $projectId,
             ]);
 
-            $this->createVersion($projectId, 'publish', $draft, $validation, $userId);
+            $versionId = $this->createVersion($projectId, 'publish', $draft, $validation, $userId);
             $this->db->commit();
 
             if ($this->auth) {
@@ -336,6 +336,7 @@ class WorkflowStudioManager {
                 'project' => $this->getProject($projectId),
                 'validation' => $validation,
                 'command' => $publish['command'] ?? null,
+                'versionId' => $versionId,
             ];
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
@@ -375,6 +376,72 @@ class WorkflowStudioManager {
 
     public function getDefaultDraft(): array {
         return $this->buildDefaultDraft();
+    }
+
+    public function replaceDraftSnapshot(
+        string $projectId,
+        array $snapshot,
+        string $userId,
+        string $versionSource = 'restore'
+    ): array {
+        $project = $this->getProject($projectId);
+        if ($project === null) {
+            return ['success' => false, 'error' => 'Workflow project not found'];
+        }
+
+        $payload = $this->normalizeProjectInput([
+            'name' => $snapshot['name'] ?? $project['name'],
+            'description' => $snapshot['description'] ?? $project['description'],
+            'commandId' => $snapshot['id'] ?? $project['commandId'],
+            'status' => $project['status'] ?? self::STATUS_DRAFT,
+            'draft' => $snapshot,
+        ], $project);
+        $validated = $this->validateDraftPayload($payload);
+        $draft = is_array($validated['draft'] ?? null) ? $validated['draft'] : $payload['draft'];
+        $validation = is_array($validated['validation'] ?? null) ? $validated['validation'] : null;
+
+        try {
+            $this->db->beginTransaction();
+            $stmt = $this->db->prepare("
+                UPDATE workflow_studio_projects
+                SET name = ?,
+                    description = ?,
+                    status = ?,
+                    command_id = ?,
+                    draft_json = ?,
+                    last_validation_json = ?,
+                    updated_at = datetime('now'),
+                    updated_by = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $payload['name'],
+                $payload['description'],
+                $payload['status'],
+                $payload['commandId'] !== '' ? $payload['commandId'] : null,
+                json_encode($draft, JSON_UNESCAPED_SLASHES),
+                $validation !== null ? json_encode($validation, JSON_UNESCAPED_SLASHES) : null,
+                $userId,
+                $projectId,
+            ]);
+
+            $versionId = $this->createVersion($projectId, $versionSource, $draft, $validation, $userId);
+            $this->db->commit();
+
+            return [
+                'success' => true,
+                'project' => $this->getProject($projectId),
+                'draft' => $draft,
+                'validation' => $validation,
+                'versionId' => $versionId,
+            ];
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+
+            return ['success' => false, 'error' => 'Failed to replace workflow draft snapshot: ' . $e->getMessage()];
+        }
     }
 
     private function normalizeProjectInput(array $input, ?array $existing): array {
@@ -482,10 +549,11 @@ class WorkflowStudioManager {
         ];
     }
 
-    private function createVersion(string $projectId, string $source, array $snapshot, ?array $validation, string $userId): void {
+    private function createVersion(string $projectId, string $source, array $snapshot, ?array $validation, string $userId): string {
         $stmt = $this->db->prepare("SELECT COALESCE(MAX(version_number), 0) AS version_number FROM workflow_studio_versions WHERE project_id = ?");
         $stmt->execute([$projectId]);
         $nextVersion = ((int)($stmt->fetch(PDO::FETCH_ASSOC)['version_number'] ?? 0)) + 1;
+        $versionId = Database::generateUUID();
 
         $insert = $this->db->prepare("
             INSERT INTO workflow_studio_versions (
@@ -493,7 +561,7 @@ class WorkflowStudioManager {
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
         $insert->execute([
-            Database::generateUUID(),
+            $versionId,
             $projectId,
             $nextVersion,
             $source,
@@ -501,6 +569,8 @@ class WorkflowStudioManager {
             $validation !== null ? json_encode($validation, JSON_UNESCAPED_SLASHES) : null,
             $userId,
         ]);
+
+        return $versionId;
     }
 
     private function findProjectByCommandId(string $commandId, string $excludeProjectId): ?array {
