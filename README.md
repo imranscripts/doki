@@ -36,11 +36,6 @@ Runtime-installed app code lives in [`app/data/installed-apps`](app/data/install
 You need:
 
 - Docker with `docker compose`
-- PHP CLI with these extensions available on the host machine:
-  - `yaml`
-  - `pdo_sqlite`
-  - `openssl`
-  - `curl`
 
 ### First run
 
