@@ -1,5 +1,6 @@
 # Ignore database file
 *.db
+playwright/
 
 # Except these
 !.gitignore

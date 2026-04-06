@@ -17,6 +17,14 @@ class WorkspaceManager {
     private const STATE_DIR_NAME = 'state';
     private const REPO_DIR_NAME = 'repo';
     private const SKIP_SCAN_DIRS = ['.git', 'node_modules', '.cache', 'test-results', 'playwright-report'];
+    private const PLAYWRIGHT_CONFIG_FILES = [
+        'playwright.config.ts',
+        'playwright.config.js',
+        'playwright.config.mts',
+        'playwright.config.mjs',
+        'playwright.config.cts',
+        'playwright.config.cjs',
+    ];
 
     private PDO $db;
     private ?array $installedApps = null;
@@ -955,10 +963,11 @@ class WorkspaceManager {
         if ($configuredPath !== '') {
             $normalized = $this->normalizeWorkspaceRelativePath($configuredPath);
             if ($normalized !== null) {
-                $configTs = ($normalized === '.' ? $repoRoot : $repoRoot . '/' . $normalized) . '/playwright.config.ts';
-                $configJs = ($normalized === '.' ? $repoRoot : $repoRoot . '/' . $normalized) . '/playwright.config.js';
-                if (file_exists($configTs) || file_exists($configJs)) {
-                    return $normalized;
+                $candidateDir = $normalized === '.' ? $repoRoot : $repoRoot . '/' . $normalized;
+                foreach (self::PLAYWRIGHT_CONFIG_FILES as $configFile) {
+                    if (file_exists($candidateDir . '/' . $configFile)) {
+                        return $normalized;
+                    }
                 }
             }
         }
@@ -981,7 +990,7 @@ class WorkspaceManager {
             }
 
             $basename = basename($path);
-            if ($basename !== 'playwright.config.ts' && $basename !== 'playwright.config.js') {
+            if (!in_array($basename, self::PLAYWRIGHT_CONFIG_FILES, true)) {
                 continue;
             }
 
