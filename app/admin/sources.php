@@ -301,7 +301,7 @@ $stats = $sourcesManager->getStats();
             color: var(--text-muted);
         }
 
-        .empty-state i { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+        .empty-state > i { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
 
         .action-bar {
             display: flex;

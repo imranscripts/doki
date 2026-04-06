@@ -346,7 +346,7 @@ $exportJsonQuery = http_build_query(array_merge($queryParams, ['format' => 'json
             color: var(--text-secondary);
         }
 
-        .empty-state i {
+        .empty-state > i {
             font-size: 48px;
             margin-bottom: 16px;
             opacity: 0.5;

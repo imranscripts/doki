@@ -306,7 +306,7 @@ $gitProviders = $sourcesManager->getProviders();
             border-radius: 12px;
         }
 
-        .empty-state i {
+        .empty-state > i {
             font-size: 48px;
             color: var(--text-muted);
             margin-bottom: 16px;

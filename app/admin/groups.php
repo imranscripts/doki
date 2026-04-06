@@ -349,7 +349,7 @@ $layout = new Layout($user, 'groups');
             color: var(--text-secondary);
         }
 
-        .empty-state i {
+        .empty-state > i {
             font-size: 36px;
             margin-bottom: 12px;
             opacity: 0.5;

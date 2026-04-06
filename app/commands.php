@@ -43,7 +43,7 @@ $isAdmin = in_array($user['role'], ['super-admin', 'admin']);
         .command-actions .btn { flex: 1; justify-content: center; padding: 8px 12px; font-size: 13px; }
         .btn-run { background: linear-gradient(135deg, var(--success), #2e9e4e); color: white; }
         .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
-        .empty-state i { font-size: 48px; margin-bottom: 16px; opacity: .5; display: block; }
+        .empty-state > i { font-size: 48px; margin-bottom: 16px; opacity: .5; display: block; }
         .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--text-primary); }
         .loading { display: flex; align-items: center; justify-content: center; padding: 60px; color: var(--text-secondary); }
         .loading i { font-size: 24px; animation: spin 1s linear infinite; }
@@ -481,7 +481,7 @@ $isAdmin = in_array($user['role'], ['super-admin', 'admin']);
 
         /* ── Delete modal ── */
         .delete-confirm { text-align: center; padding: 20px 0; }
-        .delete-confirm i { font-size: 48px; color: var(--error); margin-bottom: 16px; display: block; }
+        .delete-confirm > i { font-size: 48px; color: var(--error); margin-bottom: 16px; display: block; }
         .delete-confirm h3 { margin-bottom: 8px; }
         .delete-confirm p { color: var(--text-secondary); margin-bottom: 24px; }
         .delete-actions { display: flex; justify-content: center; gap: 12px; }

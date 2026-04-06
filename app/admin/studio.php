@@ -604,7 +604,7 @@ $starterIconOptions = [
             background: rgba(255,255,255,0.02);
         }
 
-        .ai-empty-state i {
+        .ai-empty-state > i {
             font-size: 24px;
             margin-bottom: 10px;
             color: var(--accent-primary);
@@ -1715,7 +1715,7 @@ $starterIconOptions = [
             padding: 40px;
         }
 
-        .studio-empty i {
+        .studio-empty > i {
             font-size: 40px;
             margin-bottom: 16px;
             opacity: 0.5;

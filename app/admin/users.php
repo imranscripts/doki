@@ -190,7 +190,7 @@ $currentUserIdJson = json_encode($user['id'] ?? '');
             color: var(--text-secondary);
         }
 
-        .empty-state i {
+        .empty-state > i {
             font-size: 48px;
             margin-bottom: 16px;
             opacity: 0.5;
