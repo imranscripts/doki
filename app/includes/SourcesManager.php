@@ -19,6 +19,8 @@ class SourcesManager {
     private PDO $db;
     private ConfigManager $config;
     private const CACHE_DIR = __DIR__ . '/../data/sources/.cache';
+    private const PLAYWRIGHT_CONFIG_FILE_REGEX = '/^playwright\.config\.(?:ts|js|mts|mjs|cts|cjs)$/i';
+    private const PLAYWRIGHT_TEST_FILE_REGEX = '/\.(?:spec|test)\.(?:[cm]?[jt]sx?)$/i';
     
     // Repository types
     const TYPE_APPS = 'apps';
@@ -968,7 +970,7 @@ class SourcesManager {
                 continue;
             }
 
-            if (!preg_match('/^playwright\.config\.(ts|js)$/i', basename($pathname))) {
+            if (!preg_match(self::PLAYWRIGHT_CONFIG_FILE_REGEX, basename($pathname))) {
                 continue;
             }
 
@@ -1032,7 +1034,7 @@ class SourcesManager {
                 continue;
             }
 
-            if (preg_match('/\.(test|spec)\.(ts|js)$/i', $relativePath)) {
+            if (preg_match(self::PLAYWRIGHT_TEST_FILE_REGEX, $relativePath)) {
                 $tests[] = str_replace(DIRECTORY_SEPARATOR, '/', $relativePath);
             }
         }

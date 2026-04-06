@@ -773,19 +773,35 @@ $gitProviders = $sourcesManager->getProviders();
 
         /* File Browser Modal - larger */
         .modal.file-browser {
-            max-width: 1000px;
-            height: 80vh;
+            width: 90vw;
+            max-width: 1600px;
+            height: 90vh;
+            max-height: 90vh;
+        }
+
+        .modal.file-browser .modal-header {
+            flex-shrink: 0;
+        }
+
+        .modal.file-browser .modal-body {
+            padding: 0;
+            display: flex;
+            flex: 1;
+            min-height: 0;
         }
 
         .file-browser-content {
             display: flex;
-            height: 100%;
+            flex: 1;
+            min-width: 0;
+            min-height: 0;
         }
 
         .file-tree {
-            width: 280px;
+            width: clamp(260px, 24vw, 340px);
+            flex: 0 0 clamp(260px, 24vw, 340px);
             border-right: 1px solid var(--border-color);
-            overflow-y: auto;
+            overflow: auto;
             padding: 12px;
         }
 
@@ -823,30 +839,51 @@ $gitProviders = $sourcesManager->getProviders();
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            min-width: 0;
+            min-height: 0;
         }
 
         .file-editor-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 16px;
             padding: 12px 16px;
             background: var(--bg-tertiary);
             border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            min-width: 0;
         }
 
         .file-editor-path {
             font-size: 13px;
             color: var(--text-secondary);
             font-family: 'JetBrains Mono', monospace;
+            display: block;
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-bottom: 2px;
         }
 
         .file-editor-content {
             flex: 1;
             overflow: hidden;
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .file-editor-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
         }
 
         .CodeMirror {
             height: 100%;
+            width: 100%;
             font-size: 13px;
         }
 
@@ -1326,7 +1363,7 @@ $gitProviders = $sourcesManager->getProviders();
                                 </button>
                             </div>
                         </div>
-                        <div class="modal-body" style="padding: 0; display: flex; height: calc(100% - 70px);">
+                        <div class="modal-body">
                             <div class="file-browser-content">
                                 <!-- File Tree -->
                                 <div class="file-tree">
@@ -1334,24 +1371,14 @@ $gitProviders = $sourcesManager->getProviders();
                                         <i class="fas fa-spinner fa-spin"></i> Loading...
                                     </div>
                                     <template v-else>
-                                        <div v-for="item in fileTree" :key="item.path">
-                                            <div class="file-tree-item" 
-                                                 :class="{ directory: item.isDirectory, active: selectedFile?.path === item.path }"
-                                                 @click="selectFileItem(item)">
-                                                <i :class="getFileIcon(item)"></i>
-                                                {{ item.name }}
+                                        <div v-for="entry in visibleFileTree" :key="entry.item.path">
+                                            <div class="file-tree-item"
+                                                 :class="{ directory: entry.item.isDirectory, active: selectedFile?.path === entry.item.path }"
+                                                 :style="{ paddingLeft: `${16 + (entry.depth * 20)}px` }"
+                                                 @click="selectFileItem(entry.item)">
+                                                <i :class="getFileIcon(entry.item)"></i>
+                                                {{ entry.item.name }}
                                             </div>
-                                            <template v-if="item.isDirectory && item.expanded">
-                                                <div v-for="child in item.children" :key="child.path">
-                                                    <div class="file-tree-item"
-                                                         :class="{ directory: child.isDirectory, active: selectedFile?.path === child.path }"
-                                                         style="padding-left: 28px;"
-                                                         @click="selectFileItem(child)">
-                                                        <i :class="getFileIcon(child)"></i>
-                                                        {{ child.name }}
-                                                    </div>
-                                                </div>
-                                            </template>
                                         </div>
                                     </template>
                                 </div>
@@ -1361,7 +1388,7 @@ $gitProviders = $sourcesManager->getProviders();
                                     <template v-if="selectedFile">
                                         <div class="file-editor-header">
                                             <span class="file-editor-path">{{ selectedFile.path }}</span>
-                                            <div style="display: flex; gap: 8px;">
+                                            <div class="file-editor-actions">
                                                 <?php if ($isAdmin): ?>
                                                 <button class="btn btn-sm btn-primary" v-if="!isRepositoryManagedProject(browsingProject)" @click="saveFile" :disabled="savingFile">
                                                     <i class="fas fa-save"></i>
@@ -1640,6 +1667,10 @@ $gitProviders = $sourcesManager->getProviders();
                 latestRunSession() {
                     if (this.runSessions.length === 0) return null;
                     return [...this.runSessions].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+                },
+
+                visibleFileTree() {
+                    return this.flattenFileTree(this.fileTree);
                 }
             },
 
@@ -1885,7 +1916,7 @@ $gitProviders = $sourcesManager->getProviders();
                         const response = await fetch(`../../api/playwright.php?action=files&id=${project.id}`);
                         const data = await response.json();
                         if (data.success) {
-                            this.fileTree = data.files.map(f => ({ ...f, expanded: false }));
+                            this.fileTree = this.initializeFileTree(data.files || []);
                         }
                     } catch (error) {
                         console.error('Failed to load files:', error);
@@ -1902,6 +1933,25 @@ $gitProviders = $sourcesManager->getProviders();
                         this.editor.toTextArea();
                         this.editor = null;
                     }
+                },
+
+                initializeFileTree(items = []) {
+                    return items.map(item => ({
+                        ...item,
+                        expanded: false,
+                        children: item.isDirectory ? this.initializeFileTree(item.children || []) : []
+                    }));
+                },
+
+                flattenFileTree(items = [], depth = 0) {
+                    const rows = [];
+                    for (const item of items) {
+                        rows.push({ item, depth });
+                        if (item.isDirectory && item.expanded && item.children?.length) {
+                            rows.push(...this.flattenFileTree(item.children, depth + 1));
+                        }
+                    }
+                    return rows;
                 },
 
                 getFileIcon(item) {
@@ -2018,7 +2068,7 @@ $gitProviders = $sourcesManager->getProviders();
                 },
 
                 createNewFile() {
-                    const filename = prompt('Enter file name (e.g., tests/mytest.test.ts):');
+                    const filename = prompt('Enter file name (e.g., tests/mytest.spec.ts, tests/mytest.test.js, or similar):');
                     if (!filename) return;
 
                     this.saveNewFile(filename, '');

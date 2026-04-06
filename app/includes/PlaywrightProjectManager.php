@@ -2,17 +2,89 @@
 /**
  * PlaywrightProjectManager.php - Manages Playwright test projects
  * 
- * Projects are stored in app/playwright/{project-id}/
+ * Projects are stored in app/data/playwright/projects/{project-id}/
  * Each project has:
  * - project.yaml (metadata)
- * - playwright.config.ts
- * - tests/ folder
+ * - optional playwright.config.{m,c}?{js,ts}
+ * - test files/folders
  */
 
 class PlaywrightProjectManager {
-    private const PROJECTS_DIR = __DIR__ . '/../playwright';
+    private const PROJECTS_DIR = __DIR__ . '/../data/playwright/projects';
+    private const LEGACY_PROJECTS_DIR = __DIR__ . '/../playwright';
+    private const REPORTS_DIR = __DIR__ . '/../playwright-reports-archive';
     private const MANAGED_PROJECT_PREFIX = 'src-';
     private const COPY_SKIP_NAMES = ['.git', 'node_modules', '.cache', 'test-results', 'playwright-report'];
+    private const PLAYWRIGHT_TEST_FILE_REGEX = '/\.(?:spec|test)\.(?:[cm]?[jt]sx?)$/i';
+    private static bool $storageInitialized = false;
+
+    public function __construct() {
+        $this->initializeStorage();
+    }
+
+    private function initializeStorage(): void {
+        if (self::$storageInitialized) {
+            return;
+        }
+
+        self::$storageInitialized = true;
+
+        $projectsParent = dirname(self::PROJECTS_DIR);
+        if (!is_dir($projectsParent)) {
+            mkdir($projectsParent, 0755, true);
+        }
+        if (!is_dir(self::PROJECTS_DIR)) {
+            mkdir(self::PROJECTS_DIR, 0755, true);
+        }
+
+        $this->migrateLegacyProjects();
+    }
+
+    private function migrateLegacyProjects(): void {
+        if (!is_dir(self::LEGACY_PROJECTS_DIR)) {
+            return;
+        }
+
+        $entries = scandir(self::LEGACY_PROJECTS_DIR);
+        if ($entries === false) {
+            return;
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
+                continue;
+            }
+
+            if (in_array($entry, ['node_modules', '.cache', 'test-results', 'playwright-report'], true)) {
+                continue;
+            }
+
+            $legacyPath = self::LEGACY_PROJECTS_DIR . '/' . $entry;
+            if (!is_dir($legacyPath)) {
+                continue;
+            }
+
+            $newPath = self::PROJECTS_DIR . '/' . $entry;
+            if (file_exists($newPath)) {
+                continue;
+            }
+
+            if (@rename($legacyPath, $newPath)) {
+                continue;
+            }
+
+            if (!mkdir($newPath, 0755, true) && !is_dir($newPath)) {
+                continue;
+            }
+
+            if ($this->copyDirectoryContents($legacyPath, $newPath)) {
+                $this->deleteDirectory($legacyPath);
+                continue;
+            }
+
+            $this->deleteDirectory($newPath);
+        }
+    }
     
     /**
      * Get all projects
@@ -294,7 +366,7 @@ class PlaywrightProjectManager {
         $testCount = $project['testCount'];
         
         // Find related reports
-        $reportsDir = self::PROJECTS_DIR . '/../playwright-reports-archive';
+        $reportsDir = self::REPORTS_DIR;
         $relatedReports = [];
         $reportsSize = 0;
         $videoCount = 0;
@@ -359,7 +431,7 @@ class PlaywrightProjectManager {
         
         // Delete related reports if requested
         if ($deleteReports) {
-            $reportsDir = self::PROJECTS_DIR . '/../playwright-reports-archive';
+            $reportsDir = self::REPORTS_DIR;
             
             if (is_dir($reportsDir)) {
                 $dirs = scandir($reportsDir);
@@ -1083,7 +1155,7 @@ class PlaywrightProjectManager {
                 continue;
             }
 
-            if (!preg_match('/\.(test|spec)\.(ts|js)$/i', $relativePath)) {
+            if (!preg_match(self::PLAYWRIGHT_TEST_FILE_REGEX, $relativePath)) {
                 continue;
             }
 
