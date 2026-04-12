@@ -23,6 +23,8 @@ class AppManager {
     private const APPS_DATA_DIR = __DIR__ . '/../data/apps';
     private const DEFAULT_INSTALLED_FILE = __DIR__ . '/../apps/.installed.yaml';
     private const RUNTIME_INSTALLED_FILE = __DIR__ . '/../data/installed-apps/.installed.yaml';
+    private const INSTALLED_APPS_PERMISSIONS_MARKER = __DIR__ . '/../data/installed-apps/.permissions-version';
+    private const INSTALLED_APPS_PERMISSIONS_VERSION = '1';
     private const INCLUDE_BRIDGE_DIR = __DIR__ . '/../data/includes';
     private const SOURCES_FILE = __DIR__ . '/../data/apps/sources.yaml';
     private const USERS_DATA_DIR = __DIR__ . '/../data/users';
@@ -32,6 +34,7 @@ class AppManager {
     public function __construct() {
         self::ensureRuntimeLayout();
         $this->migrateLegacyInstalledApps();
+        $this->normalizeInstalledAppPermissionsIfNeeded();
         $this->discoverApps();
     }
 
@@ -102,6 +105,30 @@ class AppManager {
     public static function buildVirtualAppScriptPath(string $appId, string $relativePath = 'index.php'): string {
         $normalizedPath = self::normalizeServedAppPath($relativePath) ?? 'index.php';
         return self::BUILTIN_APPS_DIR . '/' . trim($appId) . '/' . $normalizedPath;
+    }
+
+    public static function buildContainerAppScriptPath(string $appId, string $relativePath = 'index.php'): string {
+        $trimmedAppId = trim($appId);
+        $normalizedInput = trim(str_replace('\\', '/', $relativePath));
+        $routePrefix = '/apps/' . $trimmedAppId;
+        $routePrefixWithoutSlash = ltrim($routePrefix, '/');
+
+        if ($normalizedInput === $routePrefix || $normalizedInput === $routePrefixWithoutSlash) {
+            $normalizedInput = 'index.php';
+        } elseif (str_starts_with($normalizedInput, $routePrefix . '/')) {
+            $normalizedInput = substr($normalizedInput, strlen($routePrefix) + 1);
+        } elseif (str_starts_with($normalizedInput, $routePrefixWithoutSlash . '/')) {
+            $normalizedInput = substr($normalizedInput, strlen($routePrefixWithoutSlash) + 1);
+        }
+
+        $normalizedPath = self::normalizeServedAppPath($normalizedInput) ?? 'index.php';
+        $appDir = self::getAppDir($trimmedAppId);
+
+        if (is_string($appDir) && str_starts_with($appDir, self::INSTALLED_APPS_CODE_DIR . '/')) {
+            return '/var/www/html/data/installed-apps/' . $trimmedAppId . '/' . $normalizedPath;
+        }
+
+        return '/var/www/html/apps/' . $trimmedAppId . '/' . $normalizedPath;
     }
 
     public static function loadInstalledAppsRegistry(): array {
@@ -680,9 +707,28 @@ class AppManager {
         $renamed = @rename($tmp, $path);
         if (!$renamed) {
             @unlink($tmp);
+        } else {
+            $desiredMode = $this->getWritableModeForPath($path);
+            if ($desiredMode !== null) {
+                @chmod($path, $desiredMode);
+            }
         }
 
         return $renamed;
+    }
+
+    private function getWritableModeForPath(string $path): ?int {
+        $normalizedPath = str_replace('\\', '/', $path);
+        $installedRoot = str_replace('\\', '/', self::INSTALLED_APPS_CODE_DIR);
+        if ($normalizedPath === str_replace('\\', '/', self::RUNTIME_INSTALLED_FILE)) {
+            return 0666;
+        }
+
+        if (str_starts_with($normalizedPath, $installedRoot . '/')) {
+            return is_dir($path) ? 0777 : 0666;
+        }
+
+        return null;
     }
     
     /**
@@ -903,6 +949,54 @@ class AppManager {
     private function saveInstalledApps(array $apps): bool {
         $data = ['apps' => $apps];
         return $this->writeYamlFile(self::RUNTIME_INSTALLED_FILE, $data);
+    }
+
+    private function normalizeInstalledAppPermissionsIfNeeded(): void {
+        $currentVersion = @file_get_contents(self::INSTALLED_APPS_PERMISSIONS_MARKER);
+        if (is_string($currentVersion) && trim($currentVersion) === self::INSTALLED_APPS_PERMISSIONS_VERSION) {
+            return;
+        }
+
+        $this->normalizeInstalledAppTree(self::INSTALLED_APPS_CODE_DIR);
+        if (file_exists(self::RUNTIME_INSTALLED_FILE)) {
+            @chmod(self::RUNTIME_INSTALLED_FILE, 0666);
+        }
+
+        @file_put_contents(self::INSTALLED_APPS_PERMISSIONS_MARKER, self::INSTALLED_APPS_PERMISSIONS_VERSION . "\n");
+        @chmod(self::INSTALLED_APPS_PERMISSIONS_MARKER, 0666);
+    }
+
+    private function normalizeInstalledAppTree(string $path): void {
+        if (!file_exists($path)) {
+            return;
+        }
+
+        if (is_dir($path)) {
+            @chmod($path, 0777);
+
+            $items = @scandir($path);
+            if (!is_array($items)) {
+                return;
+            }
+
+            foreach ($items as $item) {
+                if ($item === '.' || $item === '..') {
+                    continue;
+                }
+
+                $this->normalizeInstalledAppTree($path . '/' . $item);
+            }
+
+            return;
+        }
+
+        $mode = 0666;
+        $currentPerms = @fileperms($path);
+        if (is_int($currentPerms) && ($currentPerms & 0111) !== 0) {
+            $mode = 0777;
+        }
+
+        @chmod($path, $mode);
     }
     
     /**
@@ -2294,8 +2388,9 @@ class AppManager {
         $runtime = is_array($manifest['runtime'] ?? null) ? $manifest['runtime'] : [];
         $extensions = $runtime['phpExtensions'] ?? [];
         $packages = $runtime['systemPackages'] ?? [];
+        $pythonPackages = $runtime['pythonPackages'] ?? [];
 
-        return !empty($extensions) || !empty($packages);
+        return !empty($extensions) || !empty($packages) || !empty($pythonPackages);
     }
     
     /**
@@ -2311,6 +2406,7 @@ class AppManager {
             closedir($dir);
             return false;
         }
+        @chmod($dst, 0777);
         
         while (($file = readdir($dir)) !== false) {
             if ($file === '.' || $file === '..') {
@@ -2330,6 +2426,10 @@ class AppManager {
                     closedir($dir);
                     return false;
                 }
+
+                $srcPerms = @fileperms($srcPath);
+                $mode = (is_int($srcPerms) && ($srcPerms & 0111) !== 0) ? 0777 : 0666;
+                @chmod($dstPath, $mode);
             }
         }
         

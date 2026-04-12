@@ -10,6 +10,11 @@ if (!function_exists('doki_get_session_save_path')) {
             return $volumePath;
         }
 
+        $tmpPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'doki-sessions';
+        if (is_dir($tmpPath) || (!file_exists($tmpPath) && @mkdir($tmpPath, 01777, true))) {
+            return $tmpPath;
+        }
+
         $sharedPath = realpath(__DIR__ . '/../data');
         if (is_string($sharedPath) && $sharedPath !== '') {
             return $sharedPath . '/sessions';

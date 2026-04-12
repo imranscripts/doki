@@ -2168,6 +2168,7 @@ class Layout {
                     clearSidebarSearch({ focus: true });
                 });
 
+                window.applySidebarSearch = applySidebarSearch;
                 window.clearSidebarSearch = clearSidebarSearch;
                 applySidebarSearch();
             })();
@@ -2281,7 +2282,7 @@ class Layout {
             });
 
             // Drag and Drop for Apps (Sidebar)
-            (function() {
+            function initSidebarAppDragAndDrop() {
                 const appsList = document.getElementById('apps-list');
                 if (!appsList) return;
 
@@ -2550,7 +2551,10 @@ class Layout {
                         window.Toast?.error('Failed to save app order');
                     }
                 }
-            })();
+            }
+
+            window.initSidebarAppDragAndDrop = initSidebarAppDragAndDrop;
+            initSidebarAppDragAndDrop();
 
             // Global Toast Notification System
             window.Toast = {
