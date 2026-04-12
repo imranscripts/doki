@@ -1,6 +1,8 @@
 # Doki
 ### *Create Apps and Workflows by asking AI! and do a lot more...*
 
+<img width="2988" height="1496" alt="doki-app-mkt_2026-04-12_13-37-19_c79" src="https://github.com/user-attachments/assets/a39b7c83-a5bb-4cd0-817a-934fad678faa" />
+
 Doki is a local-first workspace for running operational workflows, managing Docker-backed tools, and composing internal utilities in one place.
 
 It combines:
