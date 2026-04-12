@@ -30,6 +30,9 @@ Built-in apps currently live in [`app/apps`](app/apps):
 - `image-compress`
 - `text-diff`
 
+More apps here, you can add this repo in the sources pages:
+https://github.com/imranscripts/doki-apps
+
 Runtime-installed app code lives in [`app/data/installed-apps`](app/data/installed-apps), and per-app runtime state lives in [`app/data/apps`](app/data/apps).
 
 ## Quick Start
