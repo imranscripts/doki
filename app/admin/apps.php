@@ -111,6 +111,7 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
             border-radius: 12px;
             overflow: visible;
             transition: all 0.2s;
+            position: relative;
         }
         
         /* Ensure card content doesn't overflow, but dropdown can */
@@ -498,6 +499,11 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
             justify-content: space-between;
         }
 
+        .source-card.is-busy {
+            border-color: rgba(14, 165, 233, 0.45);
+            box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.12), 0 8px 24px rgba(14, 165, 233, 0.08);
+        }
+
         .source-info {
             display: flex;
             align-items: center;
@@ -883,6 +889,50 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
             padding: 5px 10px;
         }
 
+        .btn.is-busy,
+        .btn-sm.is-busy,
+        .app-actions-dropdown-item.is-busy {
+            position: relative;
+            opacity: 0.92;
+        }
+
+        .form-input.is-busy,
+        .form-select.is-busy,
+        .exec-target-select.is-busy,
+        .app-priority-input.is-busy,
+        .app-pinned-checkbox.is-busy {
+            opacity: 0.7;
+            cursor: progress;
+        }
+
+        .btn.is-busy,
+        .btn-sm.is-busy {
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 0 6px rgba(14, 165, 233, 0.08);
+        }
+
+        .btn.is-busy::after,
+        .btn-sm.is-busy::after,
+        .app-actions-dropdown-item.is-busy::after {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: inherit;
+            border: 1px solid rgba(14, 165, 233, 0.25);
+            animation: busyPulse 1.2s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes busyPulse {
+            0%, 100% {
+                opacity: 0.35;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.9;
+                transform: scale(1.015);
+            }
+        }
+
         .btn-success {
             background: #22c55e;
             color: white;
@@ -1139,7 +1189,7 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                 <div class="tab active" data-tab="installed" onclick="switchTab('installed')">
                     <i class="fas fa-puzzle-piece"></i>
                     Installed
-                    <span class="tab-badge"><?= count($installedApps) ?></span>
+                    <span class="tab-badge" id="installed-count"><?= count($installedApps) ?></span>
                 </div>
                 <div class="tab" data-tab="available" onclick="switchTab('available')">
                     <i class="fas fa-download"></i>
@@ -1149,7 +1199,7 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                 <div class="tab" data-tab="sources" onclick="switchTab('sources')">
                     <i class="fas fa-code-branch"></i>
                     Sources
-                    <span class="tab-badge"><?= count($sources) ?></span>
+                    <span class="tab-badge" id="sources-count"><?= count($sources) ?></span>
                 </div>
             </div>
 
@@ -1236,7 +1286,7 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                             $playwrightRuntimeStatus = $playwrightRuntimeManager->getStatus();
                         }
                     ?>
-                    <div class="app-card">
+                    <div class="app-card" id="app-card-<?= htmlspecialchars($app['id']) ?>" data-app-id="<?= htmlspecialchars($app['id']) ?>">
                         <div class="app-card-header">
                             <div class="app-icon" style="background: <?= htmlspecialchars($app['color'] ?? '#6366f1') ?>">
                                 <i class="fas <?= htmlspecialchars($app['icon'] ?? 'fa-puzzle-piece') ?>"></i>
@@ -1253,7 +1303,6 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                                 </div>
                             </div>
                         </div>
-                        
                         <?php if ($hasCustomRuntime || $isPlaywright): ?>
                         <?php
                             if ($isPlaywright) {
@@ -1366,12 +1415,12 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                                         <?php elseif ($isBuilding): ?>
                                             <span class="runtime-muted">Build in progress...</span>
                                         <?php elseif (!$imageExists): ?>
-                                            <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); buildPlaywrightRunner()" title="Build Playwright Runner">
+                                            <button class="btn btn-primary btn-sm" data-action="build-playwright-runner" onclick="event.stopPropagation(); buildPlaywrightRunner('<?= $app['id'] ?>', this)" title="Build Playwright Runner">
                                                 <i class="fas fa-hammer"></i>
                                                 <span>Build</span>
                                             </button>
                                         <?php else: ?>
-                                            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); rebuildPlaywrightRunner()" title="Rebuild Playwright Runner">
+                                            <button class="btn btn-secondary btn-sm" data-action="rebuild-playwright-runner" onclick="event.stopPropagation(); rebuildPlaywrightRunner('<?= $app['id'] ?>', this)" title="Rebuild Playwright Runner">
                                                 <i class="fas fa-redo"></i>
                                                 <span>Rebuild</span>
                                             </button>
@@ -1394,35 +1443,35 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                                     </div>
                                     <div class="runtime-actions">
                                         <?php if ($runtimeStale): ?>
-                                            <button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); rebuildAppImage('<?= $app['id'] ?>')" title="Rebuild Runtime Image">
+                                            <button class="btn btn-warning btn-sm" data-action="rebuild-image" onclick="event.stopPropagation(); rebuildAppImage('<?= $app['id'] ?>', this)" title="Rebuild Runtime Image">
                                                 <i class="fas fa-rotate"></i>
                                                 <span>Rebuild</span>
                                             </button>
                                         <?php elseif (!$imageExists && !$buildReady): ?>
-                                            <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); buildAppImage('<?= $app['id'] ?>')" title="Build Runtime Image">
+                                            <button class="btn btn-primary btn-sm" data-action="build-image" onclick="event.stopPropagation(); buildAppImage('<?= $app['id'] ?>', this)" title="Build Runtime Image">
                                                 <i class="fas fa-hammer"></i>
                                                 <span>Build</span>
                                             </button>
                                         <?php elseif (!$containerRunning): ?>
-                                            <button class="btn btn-success btn-sm" onclick="event.stopPropagation(); startAppContainer('<?= $app['id'] ?>')" title="Start Container">
+                                            <button class="btn btn-success btn-sm" data-action="start-container" onclick="event.stopPropagation(); startAppContainer('<?= $app['id'] ?>', this)" title="Start Container">
                                                 <i class="fas fa-play"></i>
                                                 <span>Start</span>
                                             </button>
-                                            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); rebuildAppImage('<?= $app['id'] ?>')" title="Rebuild Image">
+                                            <button class="btn btn-secondary btn-sm" data-action="rebuild-image" onclick="event.stopPropagation(); rebuildAppImage('<?= $app['id'] ?>', this)" title="Rebuild Image">
                                                 <i class="fas fa-redo"></i>
                                                 <span>Rebuild</span>
                                             </button>
                                         <?php else: ?>
-                                            <button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); stopAppContainer('<?= $app['id'] ?>')" title="Stop Container">
+                                            <button class="btn btn-warning btn-sm" data-action="stop-container" onclick="event.stopPropagation(); stopAppContainer('<?= $app['id'] ?>', this)" title="Stop Container">
                                                 <i class="fas fa-stop"></i>
                                                 <span>Stop</span>
                                             </button>
-                                            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); rebuildAppImage('<?= $app['id'] ?>')" title="Rebuild Image">
+                                            <button class="btn btn-secondary btn-sm" data-action="rebuild-image" onclick="event.stopPropagation(); rebuildAppImage('<?= $app['id'] ?>', this)" title="Rebuild Image">
                                                 <i class="fas fa-redo"></i>
                                                 <span>Rebuild</span>
                                             </button>
                                         <?php endif; ?>
-                                        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); cleanupRuntime('<?= $app['id'] ?>')" title="Cleanup Runtime">
+                                        <button class="btn btn-danger btn-sm" data-action="cleanup-runtime" onclick="event.stopPropagation(); cleanupRuntime('<?= $app['id'] ?>', this)" title="Cleanup Runtime">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
@@ -1467,13 +1516,13 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                                     </div>
                                     <div class="runtime-actions">
                                         <?php if (!$servicesOverview['allHealthy']): ?>
-                                            <button class="btn btn-success btn-sm" onclick="event.stopPropagation(); startAppServices('<?= $app['id'] ?>')" title="Start Required Services">
+                                            <button class="btn btn-success btn-sm" data-action="start-services" onclick="event.stopPropagation(); startAppServices('<?= $app['id'] ?>', this)" title="Start Required Services">
                                                 <i class="fas fa-play"></i>
                                                 <span>Start</span>
                                             </button>
                                         <?php endif; ?>
                                         <?php if (!empty($servicesOverview['anyRunning'])): ?>
-                                            <button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); stopAppServices('<?= $app['id'] ?>')" title="Stop Required Services">
+                                            <button class="btn btn-warning btn-sm" data-action="stop-services" onclick="event.stopPropagation(); stopAppServices('<?= $app['id'] ?>', this)" title="Stop Required Services">
                                                 <i class="fas fa-stop"></i>
                                                 <span>Stop</span>
                                             </button>
@@ -1495,7 +1544,7 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                         <div class="app-exec-target">
                             <div class="exec-target-row">
                                 <span class="exec-target-label">Docker Target</span>
-                                <select class="exec-target-select" onchange="updateAppExecTarget('<?= $app['id'] ?>', this.value)">
+                                <select class="exec-target-select" data-committed-value="<?= htmlspecialchars($execTargetId) ?>" onchange="updateAppExecTarget('<?= $app['id'] ?>', this.value, this)">
                                     <option value="">Local (default)</option>
                                     <?php if (empty($dockerTargets)): ?>
                                         <option value="" disabled>No verified Docker targets</option>
@@ -1556,16 +1605,18 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                                                        value="<?= $priority ?>" 
                                                        min="0" 
                                                        max="100"
+                                                       data-committed-value="<?= $priority ?>"
                                                        data-app-id="<?= $app['id'] ?>"
-                                                       onchange="updateAppPriority('<?= $app['id'] ?>', this.value)">
+                                                       onchange="updateAppPriority('<?= $app['id'] ?>', this.value, this)">
                                             </div>
                                             <div class="app-org-item">
                                                 <label>
                                                     <input type="checkbox" 
                                                            class="app-pinned-checkbox" 
                                                            <?= $pinned ? 'checked' : '' ?>
+                                                           data-committed-value="<?= $pinned ? '1' : '0' ?>"
                                                            data-app-id="<?= $app['id'] ?>"
-                                                           onchange="updateAppPinned('<?= $app['id'] ?>', this.checked)">
+                                                           onchange="updateAppPinned('<?= $app['id'] ?>', this.checked, this)">
                                                     Pin to Top
                                                 </label>
                                             </div>
@@ -1641,7 +1692,7 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                 <?php else: ?>
                 <div class="sources-list">
                     <?php foreach ($sources as $source): ?>
-                    <div class="source-card">
+                    <div class="source-card" id="source-card-<?= htmlspecialchars($source['id']) ?>" data-source-id="<?= htmlspecialchars($source['id']) ?>">
                         <div class="source-info">
                             <div class="source-icon">
                                 <i class="fab fa-git-alt"></i>
@@ -1652,7 +1703,7 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                             </div>
                         </div>
                         <div class="source-actions">
-                            <button class="btn btn-secondary btn-sm" onclick="syncSource('<?= $source['id'] ?>')">
+                            <button class="btn btn-secondary btn-sm" onclick="syncSource('<?= $source['id'] ?>', this)">
                                 <i class="fas fa-sync"></i>
                                 Sync
                             </button>
@@ -1710,7 +1761,7 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('addSourceModal')">Cancel</button>
-                <button class="btn btn-primary" onclick="addSource()">
+                <button class="btn btn-primary" id="addSourceButton" onclick="addSource()">
                     <i class="fas fa-plus"></i>
                     Add Source
                 </button>
@@ -1771,7 +1822,7 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('trustModal')">Cancel</button>
-                <button class="btn btn-primary" onclick="saveTrustLevel()">
+                <button class="btn btn-primary" id="saveTrustButton" onclick="saveTrustLevel()">
                     <i class="fas fa-save"></i>
                     Save
                 </button>
@@ -1848,29 +1899,316 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
         let updateTarget = null;
         let updatePreview = null;
         const isSuperAdmin = <?= $isSuperAdmin ? 'true' : 'false' ?>;
-        const reloadToastKey = 'doki.apps.reloadToast';
+        const appBusyStates = new Map();
+        const busyButtonStates = new WeakMap();
 
-        function queueReloadToast(type, message) {
-            try {
-                sessionStorage.setItem(reloadToastKey, JSON.stringify({ type, message }));
-            } catch (e) {
-                console.warn('Failed to queue reload toast', e);
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function parseHtmlDocument(html) {
+            return new DOMParser().parseFromString(html, 'text/html');
+        }
+
+        async function fetchAdminPageDocument() {
+            const response = await fetch(window.location.pathname + window.location.search, {
+                headers: { 'X-Requested-With': 'fetch' }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to refresh Apps admin page');
+            }
+
+            return parseHtmlDocument(await response.text());
+        }
+
+        function importElementFromDocument(doc, selector) {
+            const element = doc.querySelector(selector);
+            return element ? document.importNode(element, true) : null;
+        }
+
+        function syncTabCountsFromDocument(doc) {
+            ['installed-count', 'sources-count'].forEach(id => {
+                const current = document.getElementById(id);
+                const fresh = doc.getElementById(id);
+                if (current && fresh) {
+                    current.textContent = fresh.textContent;
+                }
+            });
+        }
+
+        function captureCardExpandedState(appId) {
+            return {
+                runtime: document.getElementById(`details-${appId}`)?.classList.contains('expanded') ?? false,
+                services: document.getElementById(`details-services-${appId}`)?.classList.contains('expanded') ?? false,
+            };
+        }
+
+        function setExpandedState(toggleId, detailsId, expanded) {
+            const toggle = document.getElementById(toggleId);
+            const details = document.getElementById(detailsId);
+            if (!toggle || !details) {
+                return;
+            }
+
+            toggle.classList.toggle('expanded', expanded);
+            details.classList.toggle('expanded', expanded);
+        }
+
+        function restoreCardExpandedState(appId, state) {
+            setExpandedState(`toggle-${appId}`, `details-${appId}`, !!state?.runtime);
+            setExpandedState(`toggle-services-${appId}`, `details-services-${appId}`, !!state?.services);
+        }
+
+        function setButtonBusy(button, label) {
+            if (!button) {
+                return;
+            }
+
+            if (!busyButtonStates.has(button)) {
+                busyButtonStates.set(button, {
+                    html: button.innerHTML,
+                    disabled: button.disabled,
+                });
+            }
+
+            button.disabled = true;
+            button.classList.add('is-busy');
+            button.innerHTML = `<i class="fas fa-spinner fa-spin"></i><span>${escapeHtml(label)}</span>`;
+        }
+
+        function restoreButton(button) {
+            if (!button) {
+                return;
+            }
+
+            const previous = busyButtonStates.get(button);
+            if (!previous) {
+                return;
+            }
+
+            button.innerHTML = previous.html;
+            button.disabled = previous.disabled;
+            button.classList.remove('is-busy');
+            busyButtonStates.delete(button);
+        }
+
+        function applyAppBusyState(appId) {
+            const card = document.getElementById(`app-card-${appId}`);
+            if (!card) {
+                return;
+            }
+
+            const state = appBusyStates.get(appId);
+
+            card.querySelectorAll('[data-action]').forEach(button => {
+                if (state && button.dataset.action === state.action) {
+                    setButtonBusy(button, state.buttonLabel || state.message);
+                    delete button.dataset.wasAppBusyDisabled;
+                } else {
+                    restoreButton(button);
+                    if (state) {
+                        if (!Object.prototype.hasOwnProperty.call(button.dataset, 'wasAppBusyDisabled')) {
+                            button.dataset.wasAppBusyDisabled = button.disabled ? '1' : '0';
+                        }
+                        button.disabled = true;
+                    } else if (Object.prototype.hasOwnProperty.call(button.dataset, 'wasAppBusyDisabled')) {
+                        button.disabled = button.dataset.wasAppBusyDisabled === '1';
+                        delete button.dataset.wasAppBusyDisabled;
+                    }
+                }
+            });
+        }
+
+        function setAppBusyState(appId, state) {
+            appBusyStates.set(appId, state);
+            applyAppBusyState(appId);
+        }
+
+        function clearAppBusyState(appId) {
+            appBusyStates.delete(appId);
+            applyAppBusyState(appId);
+        }
+
+        function setControlBusy(control, busy) {
+            if (!control) {
+                return;
+            }
+
+            if (busy) {
+                control.dataset.wasDisabled = control.disabled ? '1' : '0';
+                control.disabled = true;
+                control.classList.add('is-busy');
+                return;
+            }
+
+            if (Object.prototype.hasOwnProperty.call(control.dataset, 'wasDisabled')) {
+                control.disabled = control.dataset.wasDisabled === '1';
+                delete control.dataset.wasDisabled;
+            }
+            control.classList.remove('is-busy');
+        }
+
+        async function refreshInstalledTab(doc = null) {
+            const pageDoc = doc || await fetchAdminPageDocument();
+            const fresh = importElementFromDocument(pageDoc, '#tab-installed');
+            const current = document.getElementById('tab-installed');
+
+            if (fresh && current) {
+                fresh.style.display = current.style.display;
+                current.replaceWith(fresh);
+            }
+
+            syncTabCountsFromDocument(pageDoc);
+            appBusyStates.forEach((state, appId) => applyAppBusyState(appId));
+        }
+
+        async function refreshSidebarAppsNav(doc = null) {
+            const pageDoc = doc || await fetchAdminPageDocument();
+            const current = document.getElementById('apps-list');
+            const fresh = importElementFromDocument(pageDoc, '#apps-list');
+
+            if (fresh && current) {
+                current.replaceWith(fresh);
+            }
+
+            if (typeof window.initSidebarAppDragAndDrop === 'function') {
+                window.initSidebarAppDragAndDrop();
+            }
+
+            if (typeof window.applySidebarSearch === 'function') {
+                window.applySidebarSearch();
             }
         }
 
-        function showQueuedReloadToast() {
-            try {
-                const raw = sessionStorage.getItem(reloadToastKey);
-                if (!raw) return;
-                sessionStorage.removeItem(reloadToastKey);
-                const toast = JSON.parse(raw);
-                if (!toast?.message) return;
+        async function refreshSourcesTab() {
+            const doc = await fetchAdminPageDocument();
+            const fresh = importElementFromDocument(doc, '#tab-sources');
+            const current = document.getElementById('tab-sources');
 
-                const type = ['success', 'error', 'info'].includes(toast.type) ? toast.type : 'info';
-                window.Toast?.[type](toast.message);
-            } catch (e) {
-                console.warn('Failed to restore reload toast', e);
+            if (fresh && current) {
+                fresh.style.display = current.style.display;
+                current.replaceWith(fresh);
             }
+
+            syncTabCountsFromDocument(doc);
+        }
+
+        async function refreshAppCard(appId) {
+            const current = document.getElementById(`app-card-${appId}`);
+            if (!current) {
+                await refreshInstalledTab();
+                return;
+            }
+
+            const expandedState = captureCardExpandedState(appId);
+            const doc = await fetchAdminPageDocument();
+            const fresh = importElementFromDocument(doc, `#app-card-${appId}`);
+
+            syncTabCountsFromDocument(doc);
+
+            if (!fresh) {
+                await refreshInstalledTab();
+                return;
+            }
+
+            current.replaceWith(fresh);
+            restoreCardExpandedState(appId, expandedState);
+            applyAppBusyState(appId);
+        }
+
+        function setSourceBusyState(sourceId, busy) {
+            const card = document.getElementById(`source-card-${sourceId}`);
+            if (!card) {
+                return;
+            }
+
+            card.classList.toggle('is-busy', busy);
+        }
+
+        async function runJsonRequest(url, options = {}) {
+            const response = await fetch(url, options);
+            let data = null;
+
+            try {
+                data = await response.json();
+            } catch (e) {
+                throw new Error('Unexpected server response');
+            }
+
+            if (!response.ok || !data?.success) {
+                const error = new Error(data?.error || 'Request failed');
+                error.data = data;
+                throw error;
+            }
+
+            return data;
+        }
+
+        function getAppActionMeta(action) {
+            const meta = {
+                'build-image': {
+                    message: 'Building runtime image...',
+                    buttonLabel: 'Building...',
+                    success: 'Build complete!',
+                    error: 'Build failed',
+                },
+                'rebuild-image': {
+                    message: 'Rebuilding runtime image...',
+                    buttonLabel: 'Rebuilding...',
+                    success: 'Rebuild complete!',
+                    error: 'Rebuild failed',
+                },
+                'start-container': {
+                    message: 'Starting container...',
+                    buttonLabel: 'Starting...',
+                    success: 'Container started',
+                    error: 'Failed to start container',
+                },
+                'stop-container': {
+                    message: 'Stopping container...',
+                    buttonLabel: 'Stopping...',
+                    success: 'Container stopped',
+                    error: 'Failed to stop container',
+                },
+                'start-services': {
+                    message: 'Starting required services...',
+                    buttonLabel: 'Starting...',
+                    success: 'Required services are ready.',
+                    error: 'Failed to start required services',
+                },
+                'stop-services': {
+                    message: 'Stopping required services...',
+                    buttonLabel: 'Stopping...',
+                    success: 'Required services stopped.',
+                    error: 'Failed to stop required services',
+                },
+                'cleanup-runtime': {
+                    message: 'Cleaning up runtime...',
+                    buttonLabel: 'Cleaning...',
+                    success: 'Runtime cleaned up',
+                    error: 'Cleanup failed',
+                },
+                'build-playwright-runner': {
+                    message: 'Building Playwright runner...',
+                    buttonLabel: 'Building...',
+                    success: 'Build complete!',
+                    error: 'Build failed',
+                },
+                'rebuild-playwright-runner': {
+                    message: 'Rebuilding Playwright runner...',
+                    buttonLabel: 'Rebuilding...',
+                    success: 'Rebuild complete!',
+                    error: 'Rebuild failed',
+                },
+            };
+
+            return meta[action] || {
+                message: 'Working...',
+                buttonLabel: 'Working...',
+                success: 'Done',
+                error: 'Action failed',
+            };
         }
 
         function formatVersionMessage(version) {
@@ -1917,12 +2255,6 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                 : 'A super-admin must raise the app trust level before this update can be applied.';
 
             return `${data.error || 'Update blocked.'} Current trust is ${current}; required trust is ${required}. ${action}`;
-        }
-
-        if (document.readyState === 'complete') {
-            showQueuedReloadToast();
-        } else {
-            window.addEventListener('load', showQueuedReloadToast, { once: true });
         }
 
         // Tab switching
@@ -2314,6 +2646,7 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
 
         // Add source
         async function addSource() {
+            const button = document.getElementById('addSourceButton');
             const source = {
                 id: document.getElementById('sourceId').value.trim(),
                 name: document.getElementById('sourceName').value.trim(),
@@ -2327,46 +2660,49 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                 window.Toast?.error('ID and URL are required');
                 return;
             }
-            
+
+            setButtonBusy(button, 'Adding...');
             try {
-                const response = await fetch('../api/marketplace.php?action=add-source', {
+                await runJsonRequest('../api/marketplace.php?action=add-source', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(source)
                 });
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.Toast?.success('Source added');
-                    closeModal('addSourceModal');
-                    location.reload();
-                } else {
-                    window.Toast?.error(data.error || 'Failed to add source');
-                }
+
+                closeModal('addSourceModal');
+                await refreshSourcesTab();
+                await loadAvailableApps();
+                window.Toast?.success('Source added');
             } catch (e) {
-                window.Toast?.error('Failed to add source');
+                window.Toast?.error(e.message || 'Failed to add source');
+            } finally {
+                restoreButton(button);
             }
         }
 
         // Sync source (uses SourcesManager API)
-        async function syncSource(sourceId) {
-            window.Toast?.info('Syncing...');
-            
+        async function syncSource(sourceId, button) {
+            if (button?.classList.contains('is-busy')) {
+                return;
+            }
+
+            setSourceBusyState(sourceId, true);
+            setButtonBusy(button, 'Syncing...');
+            window.Toast?.info('Syncing source...');
+
             try {
-                const response = await fetch(`../api/sources.php?action=sync-repository&id=${sourceId}`, {
+                const data = await runJsonRequest(`../api/sources.php?action=sync-repository&id=${sourceId}`, {
                     method: 'POST'
                 });
-                const data = await response.json();
-                
-                if (data.success) {
-                    const apps = data.discovered?.apps || [];
-                    window.Toast?.success(`Synced! Found ${apps.length} app(s)`);
-                    loadAvailableApps();
-                } else {
-                    window.Toast?.error(data.error || 'Sync failed');
-                }
+
+                const apps = data.discovered?.apps || [];
+                await loadAvailableApps();
+                window.Toast?.success(`Synced! Found ${apps.length} app(s)`);
             } catch (e) {
-                window.Toast?.error('Sync failed');
+                window.Toast?.error(e.message || 'Sync failed');
+            } finally {
+                restoreButton(button);
+                setSourceBusyState(sourceId, false);
             }
         }
 
@@ -2375,19 +2711,15 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
             if (!confirm('Remove this source? Installed apps will remain.')) return;
             
             try {
-                const response = await fetch(`../api/marketplace.php?action=remove-source&id=${sourceId}`, {
+                await runJsonRequest(`../api/marketplace.php?action=remove-source&id=${sourceId}`, {
                     method: 'POST'
                 });
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.Toast?.success('Source removed');
-                    location.reload();
-                } else {
-                    window.Toast?.error(data.error || 'Failed to remove');
-                }
+
+                await refreshSourcesTab();
+                await loadAvailableApps();
+                window.Toast?.success('Source removed');
             } catch (e) {
-                window.Toast?.error('Failed to remove source');
+                window.Toast?.error(e.message || 'Failed to remove source');
             }
         }
 
@@ -2419,29 +2751,37 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
             const appId = document.getElementById('trustAppId').value;
             const level = parseInt(document.querySelector('.trust-option.selected input').value);
             const reason = document.getElementById('trustReason').value.trim();
+            const button = document.getElementById('saveTrustButton');
             
             if (!reason) {
                 window.Toast?.error('Reason is required');
                 return;
             }
-            
+
+            setButtonBusy(button, 'Saving...');
+            setAppBusyState(appId, {
+                action: 'trust-level',
+                message: 'Saving trust level...',
+                buttonLabel: 'Saving...',
+            });
             try {
-                const response = await fetch('../api/marketplace.php?action=set-trust', {
+                await runJsonRequest('../api/marketplace.php?action=set-trust', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ appId, trustLevel: level, reason })
                 });
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.Toast?.success('Trust level updated');
-                    closeModal('trustModal');
-                    location.reload();
-                } else {
-                    window.Toast?.error(data.error || 'Failed to update');
-                }
+
+                closeModal('trustModal');
+                await refreshAppCard(appId);
+                clearAppBusyState(appId);
+                window.Toast?.success('Trust level updated');
             } catch (e) {
-                window.Toast?.error('Failed to update trust level');
+                await refreshAppCard(appId).catch(() => {});
+                clearAppBusyState(appId);
+                const message = e.message || 'Failed to update trust level';
+                window.Toast?.error(message);
+            } finally {
+                restoreButton(button);
             }
         }
 
@@ -2513,9 +2853,11 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
             if (!installTarget) return;
             
             const trustLevel = parseInt(document.getElementById('installTrustLevel').value);
-            
+            const button = document.getElementById('installAppButton');
+
+            setButtonBusy(button, 'Installing...');
             try {
-                const response = await fetch('../api/marketplace.php?action=install', {
+                const data = await runJsonRequest('../api/marketplace.php?action=install', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2524,17 +2866,17 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                         trustLevel
                     })
                 });
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.Toast?.success('App installed!');
-                    closeModal('installModal');
-                    location.reload();
-                } else {
-                    window.Toast?.error(data.error || 'Installation failed');
-                }
+
+                closeModal('installModal');
+                const doc = await fetchAdminPageDocument();
+                await refreshInstalledTab(doc);
+                await refreshSidebarAppsNav(doc);
+                await loadAvailableApps();
+                window.Toast?.success('App installed!');
             } catch (e) {
-                window.Toast?.error('Installation failed');
+                window.Toast?.error(e.message || 'Installation failed');
+            } finally {
+                restoreButton(button);
             }
         }
 
@@ -2545,32 +2887,34 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
             }
 
             const button = document.getElementById('confirmUpdateButton');
-            button.disabled = true;
-            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+            setButtonBusy(button, 'Updating...');
+            setAppBusyState(updateTarget, {
+                action: 'update-app',
+                message: 'Updating app...',
+                buttonLabel: 'Updating...',
+            });
             
             try {
-                const response = await fetch(`../api/marketplace.php?action=update&id=${updateTarget}`, {
+                const data = await runJsonRequest(`../api/marketplace.php?action=update&id=${updateTarget}`, {
                     method: 'POST'
                 });
-                const data = await response.json();
-                
-                if (data.success) {
-                    closeUpdateModal();
-                    queueReloadToast('success', formatUpdateSuccessMessage(data));
-                    location.reload();
-                } else if (data.requiresTrustUpgrade) {
-                    button.innerHTML = '<i class="fas fa-sync"></i> Update App';
-                    button.disabled = true;
-                    window.Toast?.error(formatTrustUpgradeMessage(data));
-                } else {
-                    button.disabled = false;
-                    button.innerHTML = '<i class="fas fa-sync"></i> Update App';
-                    window.Toast?.error(data.error || 'Update failed');
-                }
+
+                closeUpdateModal();
+                await refreshAppCard(updateTarget);
+                await loadAvailableApps();
+                clearAppBusyState(updateTarget);
+                const message = formatUpdateSuccessMessage(data);
+                window.Toast?.success(message);
             } catch (e) {
-                button.disabled = false;
-                button.innerHTML = '<i class="fas fa-sync"></i> Update App';
-                window.Toast?.error('Update failed');
+                await refreshAppCard(updateTarget).catch(() => {});
+                clearAppBusyState(updateTarget);
+                const data = e.data || null;
+                const message = data?.requiresTrustUpgrade
+                    ? formatTrustUpgradeMessage(data)
+                    : (e.message || 'Update failed');
+                window.Toast?.error(message);
+            } finally {
+                restoreButton(button);
             }
         }
 
@@ -2579,23 +2923,30 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
             if (!confirm(`Uninstall "${appName}"? This will remove the app code.`)) return;
             
             const deleteData = confirm('Also delete app data?');
-            
+
+            setAppBusyState(appId, {
+                action: 'uninstall-app',
+                message: 'Uninstalling app...',
+                buttonLabel: 'Uninstalling...',
+            });
             try {
-                const response = await fetch('../api/marketplace.php?action=uninstall', {
+                await runJsonRequest('../api/marketplace.php?action=uninstall', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ appId, deleteData })
                 });
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.Toast?.success('App uninstalled');
-                    location.reload();
-                } else {
-                    window.Toast?.error(data.error || 'Uninstall failed');
-                }
+
+                const doc = await fetchAdminPageDocument();
+                await refreshInstalledTab(doc);
+                await refreshSidebarAppsNav(doc);
+                await loadAvailableApps();
+                clearAppBusyState(appId);
+                window.Toast?.success('App uninstalled');
             } catch (e) {
-                window.Toast?.error('Uninstall failed');
+                await refreshAppCard(appId).catch(() => {});
+                clearAppBusyState(appId);
+                const message = e.message || 'Uninstall failed';
+                window.Toast?.error(message);
             }
         }
 
@@ -2607,226 +2958,52 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
         }
 
         // Runtime management functions
-        async function buildAppImage(appId) {
-            window.Toast?.info('Building image...');
-            
-            try {
-                const response = await fetch(`../api/apps.php?action=build-image&app=${appId}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.Toast?.success('Build started');
-                    pollRuntimeStatus(appId);
-                } else {
-                    window.Toast?.error(data.error || 'Build failed');
-                }
-            } catch (e) {
-                window.Toast?.error('Build failed');
-            }
-        }
-
-        async function startAppContainer(appId) {
-            window.Toast?.info('Starting container...');
-            
-            try {
-                const response = await fetch(`../api/apps.php?action=start-container&app=${appId}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.Toast?.success('Container started');
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    const details = data.details ? ` (${data.details})` : '';
-                    if (data.logs) {
-                        console.error('App container logs:', data.logs);
-                    }
-                    const logHint = data.logs ? ' (see console for logs)' : '';
-                    window.Toast?.error((data.error || 'Failed to start') + details + logHint);
-                }
-            } catch (e) {
-                window.Toast?.error('Failed to start container');
-            }
-        }
-
-        async function stopAppContainer(appId) {
-            if (!confirm('Stop this app container? Users will see "unavailable" until restarted.')) return;
-            
-            try {
-                const response = await fetch(`../api/apps.php?action=stop-container&app=${appId}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.Toast?.success('Container stopped');
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    window.Toast?.error(data.error || 'Failed to stop');
-                }
-            } catch (e) {
-                window.Toast?.error('Failed to stop container');
-            }
-        }
-
-        async function startAppServices(appId) {
-            try {
-                const response = await fetch(`../api/apps.php?action=start-services&app=${encodeURIComponent(appId)}`);
-                const data = await response.json();
-
-                if (!response.ok || !data.success) {
-                    throw new Error(data.error || 'Failed to start required services');
-                }
-
-                const successMessage = data.overview?.allHealthy
-                    ? 'Required services are ready.'
-                    : 'Required services started.';
-                queueReloadToast('success', successMessage);
-                location.reload();
-            } catch (e) {
-                window.Toast?.error('Failed to start required services: ' + e.message);
-            }
-        }
-
-        async function stopAppServices(appId) {
-            if (!confirm('Stop the Docker services required by this app?')) return;
-
-            try {
-                const response = await fetch(`../api/apps.php?action=stop-services&app=${encodeURIComponent(appId)}`);
-                const data = await response.json();
-
-                if (!response.ok || !data.success) {
-                    throw new Error(data.error || 'Failed to stop required services');
-                }
-
-                queueReloadToast('success', 'Required services stopped.');
-                location.reload();
-            } catch (e) {
-                window.Toast?.error('Failed to stop required services: ' + e.message);
-            }
-        }
-
-        async function rebuildAppImage(appId) {
-            if (!confirm('Rebuild will stop the container and rebuild the image. Continue?')) return;
-            
-            window.Toast?.info('Rebuilding...');
-            
-            try {
-                const response = await fetch(`../api/apps.php?action=rebuild-image&app=${appId}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.Toast?.success('Rebuild started');
-                    pollRuntimeStatus(appId);
-                } else {
-                    window.Toast?.error(data.error || 'Rebuild failed');
-                }
-            } catch (e) {
-                window.Toast?.error('Rebuild failed');
-            }
-        }
-
-        async function cleanupRuntime(appId) {
-            if (!confirm('Remove container and image for this app? You can rebuild later.')) return;
-            
-            try {
-                const response = await fetch(`../api/apps.php?action=cleanup-runtime&app=${appId}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.Toast?.success('Cleaned up');
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    window.Toast?.error(data.error || 'Cleanup failed');
-                }
-            } catch (e) {
-                window.Toast?.error('Cleanup failed');
-            }
-        }
-
-        async function pollRuntimeStatus(appId) {
+        async function pollRuntimeStatus(appId, meta) {
             let attempts = 0;
-            const maxAttempts = 60; // 2 minutes max
-            
-            const poll = async () => {
+            const maxAttempts = 60;
+
+            while (attempts < maxAttempts) {
                 try {
                     const response = await fetch(`../api/apps.php?action=image-status&app=${appId}`);
                     const data = await response.json();
-                    
+
                     if (data.success) {
                         const buildStatus = data.build?.status;
-                        
+
                         if (buildStatus === 'ready' && data.status?.imageExists) {
-                            window.Toast?.success('Build complete!');
-                            setTimeout(() => location.reload(), 1000);
+                            clearAppBusyState(appId);
+                            await refreshAppCard(appId);
+                            window.Toast?.success(meta.success);
                             return;
                         }
-                        
+
                         if (buildStatus === 'failed') {
-                            window.Toast?.error('Build failed: ' + (data.build?.message || 'Unknown error'));
-                            setTimeout(() => location.reload(), 2000);
-                            return;
-                        }
-                        
-                        if (buildStatus === 'building' && attempts < maxAttempts) {
-                            attempts++;
-                            setTimeout(poll, 2000);
+                            clearAppBusyState(appId);
+                            await refreshAppCard(appId);
+                            const message = 'Build failed: ' + (data.build?.message || 'Unknown error');
+                            window.Toast?.error(message);
                             return;
                         }
                     }
                 } catch (e) {
                     console.error('Status poll error:', e);
                 }
-                
-                // Reload anyway after timeout
-                if (attempts >= maxAttempts) {
-                    location.reload();
-                }
-            };
-            
-            poll();
-        }
 
-        async function buildPlaywrightRunner() {
-            window.Toast?.info('Building Playwright runner...');
-
-            try {
-                const response = await fetch('../api/playwright.php?action=build-runner');
-                const data = await response.json();
-
-                if (data.success) {
-                    window.Toast?.success('Build started');
-                    pollPlaywrightRuntimeStatus();
-                } else {
-                    window.Toast?.error(data.error || 'Build failed');
-                }
-            } catch (e) {
-                window.Toast?.error('Build failed');
+                attempts += 1;
+                await delay(2000);
             }
+
+            clearAppBusyState(appId);
+            await refreshAppCard(appId).catch(() => {});
+            const message = 'Build is still running. The card can be refreshed again in place.';
+            window.Toast?.info(message);
         }
 
-        async function rebuildPlaywrightRunner() {
-            if (!confirm('Rebuild the Playwright runner image?')) return;
-
-            window.Toast?.info('Rebuilding Playwright runner...');
-
-            try {
-                const response = await fetch('../api/playwright.php?action=rebuild-runner');
-                const data = await response.json();
-
-                if (data.success) {
-                    window.Toast?.success('Rebuild started');
-                    pollPlaywrightRuntimeStatus();
-                } else {
-                    window.Toast?.error(data.error || 'Rebuild failed');
-                }
-            } catch (e) {
-                window.Toast?.error('Rebuild failed');
-            }
-        }
-
-        async function pollPlaywrightRuntimeStatus() {
+        async function pollPlaywrightRuntimeStatus(appId, meta) {
             let attempts = 0;
-            const maxAttempts = 60; // 2 minutes max
+            const maxAttempts = 60;
 
-            const poll = async () => {
+            while (attempts < maxAttempts) {
                 try {
                     const response = await fetch('../api/playwright.php?action=runtime-status');
                     const data = await response.json();
@@ -2836,20 +3013,17 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                         const imageExists = data.status?.imageExists;
 
                         if (buildStatus === 'ready' && imageExists) {
-                            window.Toast?.success('Build complete!');
-                            setTimeout(() => location.reload(), 1000);
+                            clearAppBusyState(appId);
+                            await refreshAppCard(appId);
+                            window.Toast?.success(meta.success);
                             return;
                         }
 
                         if (buildStatus === 'failed') {
-                            window.Toast?.error('Build failed: ' + (data.status?.buildStatus?.message || 'Unknown error'));
-                            setTimeout(() => location.reload(), 2000);
-                            return;
-                        }
-
-                        if (buildStatus === 'building' && attempts < maxAttempts) {
-                            attempts++;
-                            setTimeout(poll, 2000);
+                            clearAppBusyState(appId);
+                            await refreshAppCard(appId);
+                            const message = 'Build failed: ' + (data.status?.buildStatus?.message || 'Unknown error');
+                            window.Toast?.error(message);
                             return;
                         }
                     }
@@ -2857,12 +3031,257 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
                     console.error('Playwright status poll error:', e);
                 }
 
-                if (attempts >= maxAttempts) {
-                    location.reload();
-                }
-            };
+                attempts += 1;
+                await delay(2000);
+            }
 
-            poll();
+            clearAppBusyState(appId);
+            await refreshAppCard(appId).catch(() => {});
+            const message = 'Build is still running. The card can be refreshed again in place.';
+            window.Toast?.info(message);
+        }
+
+        async function buildAppImage(appId, button) {
+            if (appBusyStates.has(appId)) return;
+
+            const meta = getAppActionMeta('build-image');
+            setButtonBusy(button, meta.buttonLabel);
+            setAppBusyState(appId, { action: 'build-image', message: meta.message, buttonLabel: meta.buttonLabel });
+            window.Toast?.info(meta.message);
+
+            try {
+                const data = await runJsonRequest(`../api/apps.php?action=build-image&app=${appId}`);
+                await refreshAppCard(appId).catch(() => {});
+
+                if (data.building) {
+                    window.Toast?.success(data.message || 'Build started');
+                    await pollRuntimeStatus(appId, meta);
+                    return;
+                }
+
+                clearAppBusyState(appId);
+                await refreshAppCard(appId);
+                const message = data.message || 'Image already exists';
+                window.Toast?.success(message);
+            } catch (e) {
+                clearAppBusyState(appId);
+                await refreshAppCard(appId).catch(() => {});
+                const message = e.message || meta.error;
+                window.Toast?.error(message);
+            } finally {
+                restoreButton(button);
+            }
+        }
+
+        async function startAppContainer(appId, button) {
+            if (appBusyStates.has(appId)) return;
+
+            const meta = getAppActionMeta('start-container');
+            setButtonBusy(button, meta.buttonLabel);
+            setAppBusyState(appId, { action: 'start-container', message: meta.message, buttonLabel: meta.buttonLabel });
+            window.Toast?.info(meta.message);
+
+            try {
+                const data = await runJsonRequest(`../api/apps.php?action=start-container&app=${appId}`);
+                clearAppBusyState(appId);
+                await refreshAppCard(appId);
+                const message = data.message || meta.success;
+                window.Toast?.success(message);
+            } catch (e) {
+                clearAppBusyState(appId);
+                await refreshAppCard(appId).catch(() => {});
+                const data = e.data || null;
+                if (data?.logs) {
+                    console.error('App container logs:', data.logs);
+                }
+                const details = data?.details ? ` (${data.details})` : '';
+                const logHint = data?.logs ? ' (see console for logs)' : '';
+                const message = (data?.error || e.message || meta.error) + details + logHint;
+                window.Toast?.error(message);
+            } finally {
+                restoreButton(button);
+            }
+        }
+
+        async function stopAppContainer(appId, button) {
+            if (!confirm('Stop this app container? Users will see "unavailable" until restarted.')) return;
+            if (appBusyStates.has(appId)) return;
+
+            const meta = getAppActionMeta('stop-container');
+            setButtonBusy(button, meta.buttonLabel);
+            setAppBusyState(appId, { action: 'stop-container', message: meta.message, buttonLabel: meta.buttonLabel });
+
+            try {
+                const data = await runJsonRequest(`../api/apps.php?action=stop-container&app=${appId}`);
+                clearAppBusyState(appId);
+                await refreshAppCard(appId);
+                const message = data.message || meta.success;
+                window.Toast?.success(message);
+            } catch (e) {
+                clearAppBusyState(appId);
+                await refreshAppCard(appId).catch(() => {});
+                const message = e.message || meta.error;
+                window.Toast?.error(message);
+            } finally {
+                restoreButton(button);
+            }
+        }
+
+        async function startAppServices(appId, button) {
+            if (appBusyStates.has(appId)) return;
+
+            const meta = getAppActionMeta('start-services');
+            setButtonBusy(button, meta.buttonLabel);
+            setAppBusyState(appId, { action: 'start-services', message: meta.message, buttonLabel: meta.buttonLabel });
+            window.Toast?.info(meta.message);
+
+            try {
+                const data = await runJsonRequest(`../api/apps.php?action=start-services&app=${encodeURIComponent(appId)}`);
+                clearAppBusyState(appId);
+                await refreshAppCard(appId);
+                const message = data.overview?.allHealthy ? 'Required services are ready.' : 'Required services started.';
+                window.Toast?.success(message);
+            } catch (e) {
+                clearAppBusyState(appId);
+                await refreshAppCard(appId).catch(() => {});
+                const message = e.message || meta.error;
+                window.Toast?.error(message);
+            } finally {
+                restoreButton(button);
+            }
+        }
+
+        async function stopAppServices(appId, button) {
+            if (!confirm('Stop the Docker services required by this app?')) return;
+            if (appBusyStates.has(appId)) return;
+
+            const meta = getAppActionMeta('stop-services');
+            setButtonBusy(button, meta.buttonLabel);
+            setAppBusyState(appId, { action: 'stop-services', message: meta.message, buttonLabel: meta.buttonLabel });
+
+            try {
+                const data = await runJsonRequest(`../api/apps.php?action=stop-services&app=${encodeURIComponent(appId)}`);
+                clearAppBusyState(appId);
+                await refreshAppCard(appId);
+                const message = data.message || meta.success;
+                window.Toast?.success(message);
+            } catch (e) {
+                clearAppBusyState(appId);
+                await refreshAppCard(appId).catch(() => {});
+                const message = e.message || meta.error;
+                window.Toast?.error(message);
+            } finally {
+                restoreButton(button);
+            }
+        }
+
+        async function rebuildAppImage(appId, button) {
+            if (!confirm('Rebuild will stop the container and rebuild the image. Continue?')) return;
+            if (appBusyStates.has(appId)) return;
+
+            const meta = getAppActionMeta('rebuild-image');
+            setButtonBusy(button, meta.buttonLabel);
+            setAppBusyState(appId, { action: 'rebuild-image', message: meta.message, buttonLabel: meta.buttonLabel });
+            window.Toast?.info(meta.message);
+
+            try {
+                const data = await runJsonRequest(`../api/apps.php?action=rebuild-image&app=${appId}`);
+                await refreshAppCard(appId).catch(() => {});
+                if (data.building) {
+                    window.Toast?.success(data.message || 'Rebuild started');
+                    await pollRuntimeStatus(appId, meta);
+                    return;
+                }
+
+                clearAppBusyState(appId);
+                await refreshAppCard(appId);
+                const message = data.message || meta.success;
+                window.Toast?.success(message);
+            } catch (e) {
+                clearAppBusyState(appId);
+                await refreshAppCard(appId).catch(() => {});
+                const message = e.message || meta.error;
+                window.Toast?.error(message);
+            } finally {
+                restoreButton(button);
+            }
+        }
+
+        async function cleanupRuntime(appId, button) {
+            if (!confirm('Remove container and image for this app? You can rebuild later.')) return;
+            if (appBusyStates.has(appId)) return;
+
+            const meta = getAppActionMeta('cleanup-runtime');
+            setButtonBusy(button, meta.buttonLabel);
+            setAppBusyState(appId, { action: 'cleanup-runtime', message: meta.message, buttonLabel: meta.buttonLabel });
+
+            try {
+                const data = await runJsonRequest(`../api/apps.php?action=cleanup-runtime&app=${appId}`);
+                clearAppBusyState(appId);
+                await refreshAppCard(appId);
+                const message = data.message || meta.success;
+                window.Toast?.success(message);
+            } catch (e) {
+                clearAppBusyState(appId);
+                await refreshAppCard(appId).catch(() => {});
+                const message = e.message || meta.error;
+                window.Toast?.error(message);
+            } finally {
+                restoreButton(button);
+            }
+        }
+
+        async function buildPlaywrightRunner(appId, button) {
+            if (appBusyStates.has(appId)) return;
+
+            const meta = getAppActionMeta('build-playwright-runner');
+            setButtonBusy(button, meta.buttonLabel);
+            setAppBusyState(appId, { action: 'build-playwright-runner', message: meta.message, buttonLabel: meta.buttonLabel });
+            window.Toast?.info(meta.message);
+
+            try {
+                const data = await runJsonRequest('../api/playwright.php?action=build-runner');
+                await refreshAppCard(appId).catch(() => {});
+                if (data.building || data.success) {
+                    window.Toast?.success(data.message || 'Build started');
+                    await pollPlaywrightRuntimeStatus(appId, meta);
+                    return;
+                }
+            } catch (e) {
+                clearAppBusyState(appId);
+                await refreshAppCard(appId).catch(() => {});
+                const message = e.message || meta.error;
+                window.Toast?.error(message);
+            } finally {
+                restoreButton(button);
+            }
+        }
+
+        async function rebuildPlaywrightRunner(appId, button) {
+            if (!confirm('Rebuild the Playwright runner image?')) return;
+            if (appBusyStates.has(appId)) return;
+
+            const meta = getAppActionMeta('rebuild-playwright-runner');
+            setButtonBusy(button, meta.buttonLabel);
+            setAppBusyState(appId, { action: 'rebuild-playwright-runner', message: meta.message, buttonLabel: meta.buttonLabel });
+            window.Toast?.info(meta.message);
+
+            try {
+                const data = await runJsonRequest('../api/playwright.php?action=rebuild-runner');
+                await refreshAppCard(appId).catch(() => {});
+                if (data.building || data.success) {
+                    window.Toast?.success(data.message || 'Rebuild started');
+                    await pollPlaywrightRuntimeStatus(appId, meta);
+                    return;
+                }
+            } catch (e) {
+                clearAppBusyState(appId);
+                await refreshAppCard(appId).catch(() => {});
+                const message = e.message || meta.error;
+                window.Toast?.error(message);
+            } finally {
+                restoreButton(button);
+            }
         }
 
         // Close modals on backdrop click
@@ -2909,71 +3328,87 @@ $trustLevels = AppCapabilities::getAllTrustLevels();
         });
 
         // App Organization Functions (Batch 3)
-        async function updateAppPriority(appId, priority) {
+        async function updateAppPriority(appId, priority, control) {
             const priorityNum = parseInt(priority);
             if (isNaN(priorityNum) || priorityNum < 0 || priorityNum > 100) {
                 window.Toast?.error('Priority must be between 0 and 100');
+                if (control) {
+                    const previous = control.dataset.committedValue ?? control.defaultValue ?? '50';
+                    control.value = previous;
+                }
                 return;
             }
 
+            const previous = control ? (control.dataset.committedValue ?? control.defaultValue ?? String(priorityNum)) : String(priorityNum);
+            setControlBusy(control, true);
             try {
-                const response = await fetch(`../api/apps.php?action=set-priority&app=${appId}`, {
+                await runJsonRequest(`../api/apps.php?action=set-priority&app=${appId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ priority: priorityNum })
                 });
-                const data = await response.json();
 
-                if (data.success) {
-                    window.Toast?.success('Priority updated');
-                    // Optionally reload to see changes in sidebar
-                    setTimeout(() => location.reload(), 500);
-                } else {
-                    window.Toast?.error(data.error || 'Failed to update priority');
+                if (control) {
+                    control.dataset.committedValue = String(priorityNum);
                 }
+                window.Toast?.success('Priority updated');
             } catch (e) {
-                window.Toast?.error('Failed to update priority');
+                if (control) {
+                    control.value = previous;
+                }
+                window.Toast?.error(e.message || 'Failed to update priority');
+            } finally {
+                setControlBusy(control, false);
             }
         }
 
-        async function updateAppPinned(appId, pinned) {
+        async function updateAppPinned(appId, pinned, control) {
+            const previous = control ? (control.dataset.committedValue ?? (control.defaultChecked ? '1' : '0')) : (pinned ? '1' : '0');
+            setControlBusy(control, true);
             try {
                 // Admin page: set global default (affects all users)
-                const response = await fetch(`../api/apps.php?action=set-pinned&app=${appId}`, {
+                await runJsonRequest(`../api/apps.php?action=set-pinned&app=${appId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ pinned: pinned, global: true })
                 });
-                const data = await response.json();
 
-                if (data.success) {
-                    window.Toast?.success(pinned ? 'App pinned' : 'App unpinned');
-                    // Optionally reload to see changes in sidebar
-                    setTimeout(() => location.reload(), 500);
-                } else {
-                    window.Toast?.error(data.error || 'Failed to update pinned status');
+                if (control) {
+                    control.dataset.committedValue = pinned ? '1' : '0';
+                    control.defaultChecked = pinned;
                 }
+                window.Toast?.success(pinned ? 'App pinned' : 'App unpinned');
             } catch (e) {
-                window.Toast?.error('Failed to update pinned status');
+                if (control) {
+                    control.checked = previous === '1';
+                }
+                window.Toast?.error(e.message || 'Failed to update pinned status');
+            } finally {
+                setControlBusy(control, false);
             }
         }
 
-        async function updateAppExecTarget(appId, targetId) {
+        async function updateAppExecTarget(appId, targetId, control) {
+            const previous = control ? (control.dataset.committedValue ?? control.value) : targetId;
+            setControlBusy(control, true);
             try {
-                const response = await fetch('../api/marketplace.php?action=set-exec-target', {
+                await runJsonRequest('../api/marketplace.php?action=set-exec-target', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ appId, targetId })
                 });
-                const data = await response.json();
-                
-                if (data.success) {
-                    window.Toast?.success(targetId ? 'Exec target updated' : 'Exec target cleared');
-                } else {
-                    window.Toast?.error(data.error || 'Failed to update exec target');
+
+                if (control) {
+                    control.dataset.committedValue = targetId;
                 }
+                window.Toast?.success(targetId ? 'Exec target updated' : 'Exec target cleared');
             } catch (e) {
-                window.Toast?.error('Failed to update exec target');
+                if (control) {
+                    control.value = previous;
+                }
+                window.Toast?.error(e.message || 'Failed to update exec target');
+            } finally {
+                setControlBusy(control, false);
             }
         }
 

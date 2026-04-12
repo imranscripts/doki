@@ -604,6 +604,10 @@ $starterIconOptions = [
             background: rgba(255,255,255,0.02);
         }
 
+        .ai-empty-state.inline {
+            margin: 0;
+        }
+
         .ai-empty-state > i {
             font-size: 24px;
             margin-bottom: 10px;
@@ -643,6 +647,74 @@ $starterIconOptions = [
 
         .ai-message.assistant .ai-message-bubble {
             background: rgba(15, 23, 42, 0.38);
+        }
+
+        .ai-message.context .ai-message-role {
+            color: rgba(96, 165, 250, 0.92);
+        }
+
+        .ai-message.context .ai-message-bubble {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            background: rgba(37, 99, 235, 0.08);
+            border-color: rgba(96, 165, 250, 0.24);
+        }
+
+        .ai-context-bubble-copy {
+            min-width: 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .ai-context-bubble-copy i {
+            margin-top: 2px;
+            color: rgba(96, 165, 250, 0.92);
+        }
+
+        .ai-context-bubble-text {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .ai-context-bubble-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .ai-context-bubble-description {
+            min-width: 0;
+            color: var(--text-secondary);
+            word-break: break-word;
+        }
+
+        .ai-context-bubble-remove {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            line-height: 1;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            background: rgba(15, 23, 42, 0.42);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .ai-context-bubble-remove:hover {
+            border-color: rgba(248, 113, 113, 0.35);
+            background: rgba(127, 29, 29, 0.2);
+            color: #fca5a5;
         }
 
         .ai-message-actions {
@@ -3181,6 +3253,25 @@ $starterIconOptions = [
             return description;
         }
 
+        function clearAiDomTarget(options = {}) {
+            studioState.ai.domTarget = createEmptyAiDomTarget();
+
+            if (studioState.ai.pickerActive) {
+                stopPreviewElementPicker();
+            } else {
+                const doc = getPreviewFrameDocument();
+                if (doc) clearPreviewPickerMarkers(doc);
+            }
+
+            renderAiMessages();
+            renderAiSelectionHint();
+            renderAiTargetModalSummary();
+
+            if (!options.silent) {
+                window.Toast?.success('Selected element cleared');
+            }
+        }
+
         function updatePreviewElementPickerButton() {
             if (!pickPreviewElementBtn) return;
             if (studioState.ai.pickerActive) {
@@ -3214,11 +3305,14 @@ $starterIconOptions = [
             };
             if (aiTargetSearchInput) aiTargetSearchInput.value = '';
             stopPreviewElementPicker();
+            const previewDoc = getPreviewFrameDocument();
+            if (previewDoc) clearPreviewPickerMarkers(previewDoc);
             closeAiTargetLinesModal();
             renderAiTargetEditor();
             renderAiTargetModalSummary();
             renderAiTargetModalFileList();
             renderAiSelectionHint();
+            renderAiMessages();
         }
 
         function setAiStatus(message) {
@@ -4116,10 +4210,13 @@ $starterIconOptions = [
             if (aiTargetSearchInput) aiTargetSearchInput.value = '';
             closeAiTargetLinesModal();
             stopPreviewElementPicker();
+            const previewDoc = getPreviewFrameDocument();
+            if (previewDoc) clearPreviewPickerMarkers(previewDoc);
             renderAiTargetModalFileList();
             renderAiTargetModalSummary();
             loadAiTargetViewer('');
             renderAiSelectionHint();
+            renderAiMessages();
         }
 
         function useCurrentFileAsAiTargetDraft() {
@@ -4427,6 +4524,7 @@ $starterIconOptions = [
                 setHovered(null);
                 stopPreviewElementPicker();
                 applyStoredPreviewElementSelection();
+                renderAiMessages();
                 renderAiSelectionHint();
                 renderAiTargetModalSummary();
                 window.Toast?.success(`Selected ${describeAiDomTarget()}`);
@@ -4478,24 +4576,27 @@ $starterIconOptions = [
             studioState.ai.pickerActive = true;
             updatePreviewElementPickerButton();
             attachPreviewElementPicker();
-            window.Toast?.success('Hover elements in the live preview, then click one to target it.');
         }
 
         function renderAiMessages() {
             if (!studioState.ai.enabled || !aiMessages) return;
 
             const messages = studioState.ai.messages;
+            const messageItems = [];
+            const emptyStateCopy = aiProviderSelect?.disabled
+                ? 'Connect an AI provider to start building with prompts.'
+                : 'Ask for a change, then review the proposed file edits before applying them.';
+
             if (!messages.length) {
-                aiMessages.innerHTML = `
-                    <div class="ai-empty-state">
+                messageItems.push(`
+                    <div class="ai-empty-state ${hasAiDomTarget() ? 'inline' : ''}">
                         <i class="fas fa-robot"></i>
-                        <div>${escapeHtml(aiProviderSelect?.disabled ? 'Connect an AI provider to start building with prompts.' : 'Ask for a change, then review the proposed file edits before applying them.')}</div>
+                        <div>${escapeHtml(emptyStateCopy)}</div>
                     </div>
-                `;
-                return;
+                `);
             }
 
-            aiMessages.innerHTML = messages.map((message, index) => {
+            messageItems.push(...messages.map((message, index) => {
                 const messageId = String(message.id || `ai-msg-fallback-${index}`);
                 const revertOperations = Array.isArray(message.revertOperations) ? message.revertOperations : [];
                 const canRevert = message.role === 'assistant' && revertOperations.length > 0 && !message.reverted;
@@ -4522,11 +4623,44 @@ $starterIconOptions = [
                         ${actionHtml}
                     </div>
                 `;
-            }).join('');
+            }));
+
+            if (hasAiDomTarget()) {
+                messageItems.push(`
+                    <div class="ai-message context">
+                        <div class="ai-message-role">Selected Element</div>
+                        <div class="ai-message-bubble">
+                            <div class="ai-context-bubble-copy">
+                                <i class="fas fa-arrow-pointer"></i>
+                                <div class="ai-context-bubble-text">
+                                    <div class="ai-context-bubble-title">Live preview target</div>
+                                    <div class="ai-context-bubble-description">${escapeHtml(describeAiDomTarget())}</div>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                class="ai-context-bubble-remove"
+                                data-ai-dom-target-remove="true"
+                                aria-label="Remove selected element"
+                                title="Remove selected element"
+                            >
+                                <i class="fas fa-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+                `);
+            }
+
+            aiMessages.innerHTML = messageItems.join('');
             aiMessages.querySelectorAll('[data-ai-message-revert]').forEach(button => {
                 button.addEventListener('click', () => {
                     const messageId = button.getAttribute('data-ai-message-revert') || '';
                     revertAiMessage(messageId);
+                });
+            });
+            aiMessages.querySelectorAll('[data-ai-dom-target-remove]').forEach(button => {
+                button.addEventListener('click', () => {
+                    clearAiDomTarget({ silent: true });
                 });
             });
             aiMessages.scrollTop = aiMessages.scrollHeight;

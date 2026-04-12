@@ -550,17 +550,19 @@ try {
             
             $builder = new AppImageBuilder($appId, $app);
             $result = $builder->cleanup();
+
+            if ($result['success']) {
+                $auth->auditLog(
+                    $user['id'],
+                    $user['username'],
+                    'app_runtime_cleanup',
+                    'app_runtime',
+                    $appId,
+                    'Cleaned up runtime for app: ' . $appId
+                );
+            }
             
-            $auth->auditLog(
-                $user['id'],
-                $user['username'],
-                'app_runtime_cleanup',
-                'app_runtime',
-                $appId,
-                'Cleaned up runtime for app: ' . $appId
-            );
-            
-            jsonResponse($result);
+            jsonResponse($result, $result['success'] ? 200 : 500);
             break;
         
         case 'set-priority':

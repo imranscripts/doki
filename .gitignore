@@ -28,6 +28,7 @@
 /app/studio-previews/*
 !/app/studio-previews/.gitignore
 .claude
-/to_another_repo
+.codex
 .env
 *.sqlite
+*.Identifier

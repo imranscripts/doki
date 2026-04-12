@@ -124,23 +124,83 @@ class AppImageBuilder {
         ];
     }
 
+    private function ensureWritableDirectory(string $path): bool {
+        $path = trim($path);
+        if ($path === '') {
+            return false;
+        }
+
+        if (is_dir($path)) {
+            return is_writable($path);
+        }
+
+        if (file_exists($path)) {
+            return false;
+        }
+
+        return @mkdir($path, 0755, true) && is_writable($path);
+    }
+
+    private function resolveWritableDirectory(array $candidates): ?string {
+        foreach ($candidates as $candidate) {
+            if (!is_string($candidate)) {
+                continue;
+            }
+
+            $candidate = trim($candidate);
+            if ($candidate === '') {
+                continue;
+            }
+
+            if ($this->ensureWritableDirectory($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function getDockerCommandEnv(): array {
+        $env = [
+            'DOCKER_HOST' => getenv('DOCKER_HOST') ?: 'unix:///var/run/docker.sock',
+        ];
+
+        $dockerConfigDir = $this->resolveWritableDirectory([
+            (string)(getenv('DOCKER_CONFIG') ?: ''),
+            __DIR__ . '/../data/docker-config',
+            sys_get_temp_dir() . '/doki-docker-config',
+        ]);
+        if ($dockerConfigDir !== null) {
+            $env['DOCKER_CONFIG'] = $dockerConfigDir;
+        }
+
+        $homeDir = $this->resolveWritableDirectory([
+            (string)(getenv('HOME') ?: ''),
+            sys_get_temp_dir(),
+            __DIR__ . '/../data',
+            (string)($dockerConfigDir ?? ''),
+        ]);
+        if ($homeDir !== null) {
+            $env['HOME'] = $homeDir;
+        }
+
+        return $env;
+    }
+
+    private function buildDockerEnvPrefix(): string {
+        $parts = [];
+        foreach ($this->getDockerCommandEnv() as $key => $value) {
+            $parts[] = sprintf('%s=%s', $key, escapeshellarg($value));
+        }
+
+        return implode(' ', $parts) . ' ';
+    }
+
     /**
      * Run a Docker command with a consistent local daemon configuration.
      */
     private function runDockerCommand(string $cmd, int $timeoutSeconds = 2): array {
-        $dockerConfigDir = '/tmp/doki-docker-config';
-        if (!is_dir($dockerConfigDir)) {
-            @mkdir($dockerConfigDir, 0755, true);
-        }
-
-        $dockerHost = getenv('DOCKER_HOST') ?: 'unix:///var/run/docker.sock';
-        $prefix = sprintf(
-            'DOCKER_HOST=%s DOCKER_CONFIG=%s HOME=/tmp ',
-            escapeshellarg($dockerHost),
-            escapeshellarg($dockerConfigDir)
-        );
-
-        return $this->runCommandQuick($prefix . $cmd, $timeoutSeconds);
+        return $this->runCommandQuick($this->buildDockerEnvPrefix() . $cmd, $timeoutSeconds);
     }
 
     /**
@@ -358,8 +418,9 @@ class AppImageBuilder {
         $runtime = $this->manifest['runtime'] ?? [];
         $extensions = $runtime['phpExtensions'] ?? [];
         $packages = $runtime['systemPackages'] ?? [];
+        $pythonPackages = $runtime['pythonPackages'] ?? [];
         
-        return !empty($extensions) || !empty($packages);
+        return !empty($extensions) || !empty($packages) || !empty($pythonPackages);
     }
     
     /**
@@ -374,6 +435,13 @@ class AppImageBuilder {
      */
     public function getRequiredPackages(): array {
         return $this->manifest['runtime']['systemPackages'] ?? [];
+    }
+
+    /**
+     * Get required Python packages
+     */
+    public function getRequiredPythonPackages(): array {
+        return $this->manifest['runtime']['pythonPackages'] ?? [];
     }
 
     /**
@@ -478,6 +546,7 @@ class AppImageBuilder {
     public function generateDockerfile(): string {
         $extensions = $this->getRequiredExtensions();
         $packages = $this->getRequiredPackages();
+        $pythonPackages = $this->getRequiredPythonPackages();
         
         $customParts = [];
         
@@ -489,12 +558,18 @@ class AppImageBuilder {
                 $allDeps = array_merge($allDeps, self::EXTENSION_DEPS[$ext]);
             }
         }
-        $allDeps = array_unique($allDeps);
+        if (!empty($pythonPackages)) {
+            $allDeps = array_merge($allDeps, ['python3', 'python3-venv', 'python3-pip']);
+        }
+        $allDeps = array_values(array_unique(array_filter(array_map(
+            static fn($value): string => trim((string)$value),
+            $allDeps
+        ))));
         
         // Install system dependencies
         if (!empty($allDeps)) {
             $depsStr = implode(' ', array_map('escapeshellarg', $allDeps));
-            $customParts[] = "# Install system dependencies for extensions";
+            $customParts[] = "# Install system dependencies for runtime requirements";
             $customParts[] = "RUN apt-get update && apt-get install -y {$depsStr} && rm -rf /var/lib/apt/lists/*";
             $customParts[] = "";
         }
@@ -518,6 +593,15 @@ class AppImageBuilder {
                     $customParts[] = "RUN docker-php-ext-install {$ext}";
                 }
             }
+            $customParts[] = "";
+        }
+
+        if (!empty($pythonPackages)) {
+            $pythonPackagesStr = implode(' ', array_map('escapeshellarg', $pythonPackages));
+            $customParts[] = "# Install Python runtime packages";
+            $customParts[] = "RUN python3 -m venv /opt/doki-python && \\";
+            $customParts[] = "    /opt/doki-python/bin/pip install --no-cache-dir --upgrade pip && \\";
+            $customParts[] = "    /opt/doki-python/bin/pip install --no-cache-dir {$pythonPackagesStr}";
             $customParts[] = "";
         }
         
@@ -589,18 +673,9 @@ class AppImageBuilder {
         
         // Build the image
         $imageName = $this->getImageName();
-        
-        // Set Docker config to writable location
-        $dockerConfigDir = '/tmp/doki-docker-config';
-        if (!is_dir($dockerConfigDir)) {
-            mkdir($dockerConfigDir, 0755, true);
-        }
-        
-        $dockerHost = getenv('DOCKER_HOST') ?: 'unix:///var/run/docker.sock';
         $buildCmd = sprintf(
-            'DOCKER_HOST=%s DOCKER_CONFIG=%s HOME=/tmp docker build -t %s %s 2>&1',
-            escapeshellarg($dockerHost),
-            escapeshellarg($dockerConfigDir),
+            '%sdocker build -t %s %s 2>&1',
+            $this->buildDockerEnvPrefix(),
             escapeshellarg($imageName),
             escapeshellarg($buildDir)
         );
@@ -1030,30 +1105,65 @@ class AppImageBuilder {
     /**
      * Remove container (stop and delete)
      */
+    private function containerExists(int $timeoutSeconds = 5): bool {
+        $containerName = $this->getContainerName();
+        $result = $this->runDockerCommand(
+            "docker ps -a --filter 'name=^{$containerName}$' --format '{{.ID}}' 2>&1",
+            $timeoutSeconds
+        );
+        $output = trim((string)($result['output'] ?? ''));
+        if ($output !== '' && !$this->looksLikeDockerError($output)) {
+            return true;
+        }
+
+        return false;
+    }
+
     public function removeContainer(): array {
         $containerName = $this->getContainerName();
-        
+        $outputParts = [];
+
+        if (!$this->containerExists()) {
+            return [
+                'success' => true,
+                'message' => 'Container does not exist',
+                'output' => '',
+            ];
+        }
+
         // Stop if running
         if ($this->isContainerRunning()) {
-            $this->runDockerCommand("docker stop {$containerName} 2>&1", 10);
+            $stopResult = $this->runDockerCommand("docker stop {$containerName} 2>&1", 10);
+            $stopOutput = trim((string)($stopResult['output'] ?? ''));
+            if ($stopOutput !== '') {
+                $outputParts[] = $stopOutput;
+            }
         }
-        
+
         // Remove container
         $result = $this->runDockerCommand("docker rm {$containerName} 2>&1", 10);
-        
+        $removeOutput = trim((string)($result['output'] ?? ''));
+        if ($removeOutput !== '') {
+            $outputParts[] = $removeOutput;
+        }
+        $containerRemoved = !$this->containerExists();
+
         return [
-            'success' => $result['success'] || strpos($result['output'] ?? '', 'No such container') !== false,
-            'message' => 'Container removed',
-            'output' => trim($result['output'] ?? '')
+            'success' => $containerRemoved,
+            'message' => $containerRemoved ? 'Container removed' : 'Failed to remove container',
+            'output' => trim(implode("\n", array_filter($outputParts))),
+            'error' => $containerRemoved ? null : ($removeOutput !== '' ? $removeOutput : 'Container still exists after removal attempt'),
         ];
     }
     
     /**
      * Remove the custom image
      */
-    public function removeImage(): array {
+    public function removeImage(bool $ensureContainerRemoved = true): array {
         // Remove container first
-        $this->removeContainer();
+        if ($ensureContainerRemoved) {
+            $this->removeContainer();
+        }
 
         $this->removeStatusFile();
         
@@ -1065,10 +1175,14 @@ class AppImageBuilder {
         
         $removeCmd = sprintf('docker rmi %s 2>&1', escapeshellarg($imageName));
         $result = $this->runDockerCommand($removeCmd, 10);
+        $removed = !$this->imageExists();
+        $output = trim((string)($result['output'] ?? ''));
         
         return [
-            'success' => $result['success'],
-            'output' => $result['output'] ?? ''
+            'success' => $removed,
+            'message' => $removed ? 'Image removed' : 'Failed to remove image',
+            'output' => $output,
+            'error' => $removed ? null : ($output !== '' ? $output : 'Image still exists after removal attempt'),
         ];
     }
     
@@ -1079,10 +1193,26 @@ class AppImageBuilder {
         $results = [];
         
         $results['container'] = $this->removeContainer();
-        $results['image'] = $this->removeImage();
+        $results['image'] = $this->removeImage(false);
+
+        $errors = [];
+        foreach ($results as $result) {
+            if (!is_array($result) || !empty($result['success'])) {
+                continue;
+            }
+
+            $error = trim((string)($result['error'] ?? $result['output'] ?? ''));
+            if ($error !== '') {
+                $errors[] = $error;
+            }
+        }
         
         return [
             'success' => $results['container']['success'] && $results['image']['success'],
+            'message' => ($results['container']['success'] && $results['image']['success'])
+                ? 'Runtime cleaned up'
+                : 'Runtime cleanup failed',
+            'error' => $errors !== [] ? implode(' | ', $errors) : null,
             'results' => $results
         ];
     }

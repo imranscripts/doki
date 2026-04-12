@@ -15,6 +15,7 @@ require_once __DIR__ . '/Orchestrator.php';
 require_once __DIR__ . '/AppManager.php';
 require_once __DIR__ . '/PermissionManager.php';
 require_once __DIR__ . '/OnboardingManager.php';
+require_once __DIR__ . '/RuntimeEnvironment.php';
 require_once __DIR__ . '/StealthGuard.php';
 require_once __DIR__ . '/session-bootstrap.php';
 
@@ -1811,6 +1812,20 @@ class AppContext {
         $cleanup = $bundle['cleanup'];
         $previous = [];
 
+        if (!array_key_exists('DOCKER_CONFIG', $env) || trim((string)$env['DOCKER_CONFIG']) === '') {
+            $dockerConfigDir = $this->ensureWritableDockerConfigDir();
+            if ($dockerConfigDir !== null) {
+                $env['DOCKER_CONFIG'] = $dockerConfigDir;
+            }
+        }
+
+        if (!array_key_exists('HOME', $env) || trim((string)$env['HOME']) === '') {
+            $homeDir = $this->ensureWritableDockerHomeDir();
+            if ($homeDir !== null) {
+                $env['HOME'] = $homeDir;
+            }
+        }
+
         foreach ($env as $key => $value) {
             $previous[$key] = getenv($key);
             putenv($key . '=' . $value);
@@ -1830,6 +1845,44 @@ class AppContext {
                 $this->cleanupPath($path);
             }
         }
+    }
+
+    private function ensureWritableDockerConfigDir(): ?string {
+        $candidates = [
+            sys_get_temp_dir() . '/doki-docker-config',
+            __DIR__ . '/../data/docker-config',
+        ];
+
+        foreach ($candidates as $candidate) {
+            if ($this->ensureDirectory($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function ensureWritableDockerHomeDir(): ?string {
+        $candidates = [
+            sys_get_temp_dir(),
+            __DIR__ . '/../data',
+        ];
+
+        foreach ($candidates as $candidate) {
+            if ($this->ensureDirectory($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function ensureDirectory(string $path): bool {
+        if (is_dir($path)) {
+            return is_writable($path);
+        }
+
+        return @mkdir($path, 0755, true) && is_writable($path);
     }
 
     private function writeTempSecretFile(string $content, string $prefix): string {
@@ -2721,7 +2774,201 @@ class AppContext {
      * Get the Docker host for container-to-host communication
      */
     public function getDockerHost(): string {
-        return getenv('DOCKER_HOST_INTERNAL') ?: 'host.docker.internal';
+        return $this->getServicePublicHost();
+    }
+
+    private function getConfiguredDockerHost(): ?string {
+        $configured = RuntimeEnvironment::getEnvValue('DOCKER_HOST_INTERNAL');
+        if ($configured === null) {
+            return null;
+        }
+
+        return $this->normalizeHostValue($configured);
+    }
+
+    private function getServicePublicHost(): string {
+        $configured = $this->getConfiguredDockerHost();
+        if ($configured !== null) {
+            return $configured;
+        }
+
+        $requestHost = $this->getRequestHostname();
+        if ($requestHost !== null) {
+            return $requestHost;
+        }
+
+        return '127.0.0.1';
+    }
+
+    private function getServiceRuntimeHost(): string {
+        $configured = $this->getConfiguredDockerHost();
+        if ($configured !== null) {
+            return $configured;
+        }
+
+        if (RuntimeEnvironment::isContainerRuntime()) {
+            $gateway = $this->getContainerDefaultGateway();
+            if ($gateway !== null) {
+                return $gateway;
+            }
+
+            return 'host.docker.internal';
+        }
+
+        return $this->getServicePublicHost();
+    }
+
+    private function getServiceHealthProbeHosts(): array {
+        $hosts = [];
+
+        $configured = $this->getConfiguredDockerHost();
+        if ($configured !== null) {
+            $hosts[] = $configured;
+        }
+
+        $requestHost = $this->getRequestHostname();
+        if ($requestHost !== null) {
+            $hosts[] = $requestHost;
+        }
+
+        if (RuntimeEnvironment::isContainerRuntime()) {
+            $hosts[] = 'host.docker.internal';
+
+            $gateway = $this->getContainerDefaultGateway();
+            if ($gateway !== null) {
+                $hosts[] = $gateway;
+            }
+        } else {
+            $hosts[] = '127.0.0.1';
+            $hosts[] = 'localhost';
+            $hosts[] = 'host.docker.internal';
+        }
+
+        $normalized = [];
+        foreach ($hosts as $host) {
+            $candidate = $this->normalizeHostValue((string)$host);
+            if ($candidate === null || isset($normalized[$candidate])) {
+                continue;
+            }
+            $normalized[$candidate] = true;
+        }
+
+        return array_keys($normalized);
+    }
+
+    private function getRequestHostname(): ?string {
+        $candidates = [
+            $_SERVER['HTTP_HOST'] ?? null,
+            $_SERVER['SERVER_NAME'] ?? null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $host = $this->normalizeHostValue(is_string($candidate) ? $candidate : null);
+            if ($host !== null) {
+                return $host;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeHostValue(?string $value): ?string {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (str_contains($value, '://')) {
+            $host = parse_url($value, PHP_URL_HOST);
+            if (!is_string($host) || trim($host) === '') {
+                return null;
+            }
+            $value = $host;
+        }
+
+        if ($value[0] === '[') {
+            $end = strpos($value, ']');
+            if ($end === false) {
+                return null;
+            }
+            $value = substr($value, 1, $end - 1);
+        } elseif (substr_count($value, ':') === 1) {
+            [$hostPart, $portPart] = explode(':', $value, 2);
+            if ($hostPart !== '' && ctype_digit($portPart)) {
+                $value = $hostPart;
+            }
+        }
+
+        $value = trim($value);
+        return $value !== '' ? $value : null;
+    }
+
+    private function getContainerDefaultGateway(): ?string {
+        $routePath = '/proc/net/route';
+        if (!is_readable($routePath)) {
+            return null;
+        }
+
+        $lines = @file($routePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (!is_array($lines)) {
+            return null;
+        }
+
+        foreach (array_slice($lines, 1) as $line) {
+            $parts = preg_split('/\s+/', trim($line));
+            if (!is_array($parts) || count($parts) < 3) {
+                continue;
+            }
+
+            [$iface, $destination, $gateway] = [$parts[0], strtoupper($parts[1]), strtoupper($parts[2])];
+            if ($iface === '' || $destination !== '00000000' || strlen($gateway) !== 8) {
+                continue;
+            }
+
+            $bytes = array_reverse(str_split($gateway, 2));
+            if (count($bytes) !== 4) {
+                continue;
+            }
+
+            $octets = array_map(
+                static fn(string $byte): int => hexdec($byte),
+                $bytes
+            );
+
+            $candidate = implode('.', $octets);
+            if (filter_var($candidate, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function probeServiceUrl(string $url): array {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 5,
+            CURLOPT_CONNECTTIMEOUT => 2,
+            CURLOPT_HTTPGET => true,
+            CURLOPT_FOLLOWLOCATION => true,
+        ]);
+
+        curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        return [
+            'healthy' => ($httpCode >= 200 && $httpCode < 400),
+            'httpCode' => $httpCode,
+            'error' => $error ?: null,
+            'url' => $url,
+        ];
     }
     
     /**
@@ -2838,7 +3085,6 @@ class AppContext {
             return ['healthy' => false, 'error' => 'Service not defined in manifest'];
         }
         
-        $host = $this->getDockerHost();
         $port = $this->getServiceHostPort($serviceName);
         if ($port === null) {
             return [
@@ -2848,28 +3094,24 @@ class AppContext {
             ];
         }
         $healthPath = $service['healthcheck'];
-        
-        $url = "http://{$host}:{$port}{$healthPath}";
-        
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 5,
-            CURLOPT_CONNECTTIMEOUT => 2,
-            CURLOPT_HTTPGET => true,
-            CURLOPT_FOLLOWLOCATION => true,
-        ]);
-        
-        curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        
-        return [
-            'healthy' => ($httpCode >= 200 && $httpCode < 400),
-            'httpCode' => $httpCode,
-            'error' => $error ?: null,
+
+        $lastResult = [
+            'healthy' => false,
+            'httpCode' => 0,
+            'error' => 'No service probe hosts available',
+            'url' => null,
         ];
+
+        foreach ($this->getServiceHealthProbeHosts() as $host) {
+            $result = $this->probeServiceUrl("http://{$host}:{$port}{$healthPath}");
+            if ($result['healthy']) {
+                return $result;
+            }
+
+            $lastResult = $result;
+        }
+
+        return $lastResult;
     }
     
     /**
@@ -2881,12 +3123,32 @@ class AppContext {
             return null;
         }
         
-        $host = $this->getDockerHost();
+        $host = getenv('DOKI_FPM_CONTAINER') === 'true'
+            ? $this->getServiceRuntimeHost()
+            : $this->getDockerHost();
         $port = $this->getServiceHostPort($serviceName);
         if ($port === null) {
             return null;
         }
         
+        return "http://{$host}:{$port}";
+    }
+
+    /**
+     * Get the URL apps should use when calling a service from server-side PHP.
+     */
+    public function getServiceRuntimeUrl(string $serviceName): ?string {
+        $service = $this->getServiceDefinition($serviceName);
+        if (!$service) {
+            return null;
+        }
+
+        $host = $this->getServiceRuntimeHost();
+        $port = $this->getServiceHostPort($serviceName);
+        if ($port === null) {
+            return null;
+        }
+
         return "http://{$host}:{$port}";
     }
     

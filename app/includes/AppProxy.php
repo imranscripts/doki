@@ -114,13 +114,14 @@ class AppProxy {
         // Determine the script to execute
         $scriptPath = $this->resolveProxyScriptPath();
         
-        // Map to actual file path
-        $scriptFilename = "/var/www/html{$scriptPath}";
+        // Map to the actual script path inside the FPM container.
+        $scriptFilename = AppManager::buildContainerAppScriptPath($this->appId, ltrim($scriptPath, '/'));
         
         // Build params
         $params = FastCGIClient::buildWebParams($scriptFilename, [
             'DOCUMENT_ROOT' => '/var/www/html',
             'SCRIPT_FILENAME' => $scriptFilename,
+            'SCRIPT_NAME' => $scriptPath,
             'PHP_SELF' => $scriptPath,
             // Pass along session info
             'HTTP_COOKIE' => $_SERVER['HTTP_COOKIE'] ?? '',

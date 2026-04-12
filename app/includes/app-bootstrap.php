@@ -36,12 +36,15 @@ if (!is_string($_bsManifest) || !file_exists($_bsManifest) || !function_exists('
 }
 
 $_bsConfig = yaml_parse_file($_bsManifest) ?: [];
-$_bsExtensions = $_bsConfig['runtime']['phpExtensions'] ?? [];
+$_bsRuntime = is_array($_bsConfig['runtime'] ?? null) ? $_bsConfig['runtime'] : [];
+$_bsHasCustomRuntime = !empty($_bsRuntime['phpExtensions'])
+    || !empty($_bsRuntime['systemPackages'])
+    || !empty($_bsRuntime['pythonPackages']);
 
-if (empty($_bsExtensions)) {
+if (!$_bsHasCustomRuntime) {
     // No custom runtime needed - flush buffer and continue
     ob_end_flush();
-    unset($_bsScript, $_bsMatch, $_bsAppId, $_bsManifest, $_bsConfig, $_bsExtensions);
+    unset($_bsScript, $_bsMatch, $_bsAppId, $_bsManifest, $_bsConfig, $_bsRuntime, $_bsHasCustomRuntime);
     return;
 }
 
@@ -73,9 +76,13 @@ if ($_bsStatus['imageExists'] && $_bsStatus['containerRunning'] && $_bsStatus['c
     $client = new FastCGIClient($info['ip'], $info['port'], 120); // Increased timeout for large responses
     
     $scriptPath = _bsResolveProxyScriptPath();
-    $scriptFilename = "/var/www/html{$scriptPath}";
+    $scriptFilename = AppManager::buildContainerAppScriptPath($_bsAppId, ltrim($scriptPath, '/'));
     
-    $params = FastCGIClient::buildWebParams($scriptFilename);
+    $params = FastCGIClient::buildWebParams($scriptFilename, [
+        'SCRIPT_NAME' => $scriptPath,
+        'PHP_SELF' => $scriptPath,
+        'HTTP_COOKIE' => $_SERVER['HTTP_COOKIE'] ?? '',
+    ]);
     
     $stdin = '';
     if (in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['POST', 'PUT', 'PATCH'])) {
