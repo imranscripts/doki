@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "product": "doki",
-  "currentVersion": "1.2.3",
+  "currentVersion": "1.2.4",
   "fallbackVersion": "1.0.0",
   "source": {
     "type": "git",
@@ -10,9 +10,51 @@
   },
   "releases": [
     {
+      "version": "1.2.4",
+      "tag": "v1.2.4",
+      "status": "current",
+      "channel": "stable",
+      "baseVersion": "1.2.3",
+      "commit": null,
+      "releasedAt": "2026-06-08T19:04:45+02:00",
+      "schemaVersion": 17,
+      "summary": "Fixes helper-initiated Compose restarts by preserving host repo paths and the active Compose project.",
+      "requirements": {
+        "requiresRestart": true,
+        "requiresRebuild": true,
+        "requiresSetupCheck": false
+      },
+      "risk": {
+        "destructive": false,
+        "destructiveChanges": [],
+        "databaseMigrations": [
+          {
+            "scope": "global",
+            "from": 17,
+            "to": 17,
+            "summary": "No global Doki schema migration.",
+            "destructive": false
+          }
+        ]
+      },
+      "changes": [
+        "Adds DOKI_HOST_ROOT so update-helper restarts use host filesystem paths for Compose bind mounts.",
+        "Passes DOKI_HOST_ROOT and the active Compose project into helper-initiated docker compose stop/start commands.",
+        "Adds an explicit default Compose project name so helper-side Compose calls do not inherit the /workspace directory name.",
+        "Discovers the active Compose project from running Doki container labels when it is not configured explicitly.",
+        "Prevents updated services from being recreated with container-local /workspace bind paths or a separate workspace project.",
+        "Keeps failed-restart recovery active until the core services actually start successfully.",
+        "Keeps database schema unchanged at version 17."
+      ],
+      "operatorNotes": [
+        "This release requires rebuilding the update-helper image and restarting core services.",
+        "No destructive changes are declared for this release."
+      ]
+    },
+    {
       "version": "1.2.3",
       "tag": "v1.2.3",
-      "status": "current",
+      "status": "stable",
       "channel": "stable",
       "baseVersion": "1.2.2",
       "commit": null,

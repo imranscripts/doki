@@ -1,5 +1,28 @@
 # Doki Changelog
 
+## 1.2.4 - 2026-06-08
+
+Fixes helper-initiated Compose restarts by preserving host repo paths and the active Compose project.
+
+### Fixed
+
+- Added `DOKI_HOST_ROOT` so update-helper restarts use host filesystem paths for Compose bind mounts.
+- Passed `DOKI_HOST_ROOT` and the active Compose project into helper-initiated `docker compose stop` and `docker compose up` commands.
+- Added an explicit default Compose project name so helper-side Compose calls do not inherit the `/workspace` directory name.
+- Taught the update-helper to discover the active Compose project from running Doki container labels.
+- Prevented updated services from being recreated with container-local `/workspace` bind paths.
+- Prevented helper restarts from creating a separate `workspace` Compose project with conflicting container names.
+- Fixed failed-restart recovery so the helper still attempts to bring core services back up after a restart error.
+
+### Database
+
+- Global Doki schema remains at version 17.
+- No destructive database migration is declared.
+
+### Destructive Changes
+
+- None declared.
+
 ## 1.2.3 - 2026-06-08
 
 Makes update-helper Git safety self-configuring at container startup.

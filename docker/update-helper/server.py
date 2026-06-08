@@ -19,6 +19,8 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(os.environ.get("DOKI_REPO_ROOT", "/workspace")).resolve()
+HOST_ROOT = os.environ.get("DOKI_HOST_ROOT") or str(REPO_ROOT)
+CONFIGURED_COMPOSE_PROJECT = (os.environ.get("DOKI_COMPOSE_PROJECT_NAME") or os.environ.get("COMPOSE_PROJECT_NAME") or "").strip()
 PORT = int(os.environ.get("DOKI_UPDATE_PORT", "8100"))
 TOKEN_FILE = Path(os.environ.get("DOKI_UPDATE_TOKEN_FILE", str(REPO_ROOT / "app/data/update-helper/tokens.json")))
 STATE_FILE = Path(os.environ.get("DOKI_UPDATE_STATE_FILE", str(REPO_ROOT / "app/data/update-helper/state.json")))
@@ -26,6 +28,7 @@ DB_PATH = Path(os.environ.get("DOKI_DB_PATH", str(REPO_ROOT / "app/data/doki.db"
 APP_HEALTH_URL = os.environ.get("DOKI_APP_HEALTH_URL", "http://php-app/")
 CORE_SERVICES = [s.strip() for s in os.environ.get("DOKI_UPDATE_CORE_SERVICES", "php-app,go-orchestrator").split(",") if s.strip()]
 REMOTE = os.environ.get("DOKI_UPDATE_REMOTE", "origin")
+COMPOSE_PROJECT_CACHE = {"value": None}
 
 SEMVER_RE = re.compile(r"^v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)$")
 JOB_LOCK = threading.Lock()
@@ -148,6 +151,45 @@ def command_result(args, cwd=REPO_ROOT, timeout=60, env=None):
             "output": str(exc),
             "durationSeconds": round(time.time() - started, 3),
         }
+
+
+def inspect_container_label(container, label):
+    if not container:
+        return ""
+    template = f"{{{{ index .Config.Labels \"{label}\" }}}}"
+    result = command_result(["docker", "inspect", "--format", template, container], timeout=10)
+    if not result["success"]:
+        return ""
+    value = result["output"].strip()
+    if not value or value == "<no value>":
+        return ""
+    return value
+
+
+def compose_project_name():
+    if COMPOSE_PROJECT_CACHE["value"] is not None:
+        return COMPOSE_PROJECT_CACHE["value"]
+
+    candidates = [
+        CONFIGURED_COMPOSE_PROJECT,
+        inspect_container_label(os.environ.get("HOSTNAME"), "com.docker.compose.project"),
+        inspect_container_label("doki-update-helper", "com.docker.compose.project"),
+        inspect_container_label("doki-main-app", "com.docker.compose.project"),
+        inspect_container_label("doki-go-orchestrator", "com.docker.compose.project"),
+        Path(HOST_ROOT).name,
+    ]
+    project = next((value for value in candidates if value), "")
+    COMPOSE_PROJECT_CACHE["value"] = project
+    return project
+
+
+def compose_env():
+    env = dict(os.environ)
+    env["DOKI_HOST_ROOT"] = HOST_ROOT
+    project = compose_project_name()
+    if project:
+        env["COMPOSE_PROJECT_NAME"] = project
+    return env
 
 
 def run_or_raise(args, cwd=REPO_ROOT, timeout=60):
@@ -381,7 +423,7 @@ def collect_health():
     except Exception as exc:
         health["app"]["error"] = str(exc)
 
-    compose = command_result(["docker", "compose", "ps"], timeout=15)
+    compose = command_result(["docker", "compose", "ps"], timeout=15, env=compose_env())
     health["compose"]["ok"] = compose["success"]
     if compose["success"]:
         health["compose"]["output"] = compose["output"]
@@ -602,13 +644,13 @@ def write_maintenance(active, payload=None):
 
 def stop_core_services():
     if CORE_SERVICES:
-        return command_result(["docker", "compose", "stop", *CORE_SERVICES], timeout=180)
+        return command_result(["docker", "compose", "stop", *CORE_SERVICES], timeout=180, env=compose_env())
     return {"success": True, "output": "", "exitCode": 0}
 
 
 def start_core_services():
     if CORE_SERVICES:
-        return command_result(["docker", "compose", "up", "-d", "--build", *CORE_SERVICES], timeout=900)
+        return command_result(["docker", "compose", "up", "-d", "--build", *CORE_SERVICES], timeout=900, env=compose_env())
     return {"success": True, "output": "", "exitCode": 0}
 
 
@@ -696,9 +738,9 @@ def run_apply_job(job, target_version, confirm_version, token_record):
 
         update_job(stage="starting-services", progress=88)
         start_result = start_core_services()
-        stopped = False
         if not start_result["success"]:
             raise UpdateError("Updated files and migrations succeeded, but service restart failed.", {"output": start_result["output"], "backupPath": backup_path})
+        stopped = False
 
         history_entry = {
             "fromVersion": check["currentVersion"],
