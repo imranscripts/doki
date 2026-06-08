@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "product": "doki",
-  "currentVersion": "1.2.7",
+  "currentVersion": "1.2.8",
   "fallbackVersion": "1.0.0",
   "source": {
     "type": "git",
@@ -10,9 +10,48 @@
   },
   "releases": [
     {
+      "version": "1.2.8",
+      "tag": "v1.2.8",
+      "status": "current",
+      "channel": "stable",
+      "baseVersion": "1.2.7",
+      "commit": null,
+      "releasedAt": "2026-06-08T23:36:49+02:00",
+      "schemaVersion": 17,
+      "summary": "Corrects the Doki Updates helper interface polish.",
+      "requirements": {
+        "requiresRestart": true,
+        "requiresRebuild": true,
+        "requiresSetupCheck": false
+      },
+      "risk": {
+        "destructive": false,
+        "destructiveChanges": [],
+        "databaseMigrations": [
+          {
+            "scope": "global",
+            "from": 17,
+            "to": 17,
+            "summary": "No global Doki schema migration.",
+            "destructive": false
+          }
+        ]
+      },
+      "changes": [
+        "Restores the dark update-helper interface.",
+        "Removes sticky behavior from the update status/progress panel.",
+        "Keeps the clearer release review, readiness, confirmation hint, and job progress layout.",
+        "Keeps database schema unchanged at version 17."
+      ],
+      "operatorNotes": [
+        "Use this release to correct the 1.2.7 update-helper interface polish.",
+        "No destructive changes are declared for this release."
+      ]
+    },
+    {
       "version": "1.2.7",
       "tag": "v1.2.7",
-      "status": "current",
+      "status": "stable",
       "channel": "stable",
       "baseVersion": "1.2.6",
       "commit": null,

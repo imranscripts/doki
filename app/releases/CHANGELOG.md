@@ -1,5 +1,24 @@
 # Doki Changelog
 
+## 1.2.8 - 2026-06-08
+
+Corrects the Doki Updates helper interface polish.
+
+### Changed
+
+- Restored the dark update-helper interface.
+- Removed sticky behavior from the update status/progress panel.
+- Kept the clearer release review, readiness, confirmation hint, and job progress layout.
+
+### Database
+
+- Global Doki schema remains at version 17.
+- No destructive database migration is declared.
+
+### Destructive Changes
+
+- None declared.
+
 ## 1.2.7 - 2026-06-08
 
 Polishes the Doki Updates helper interface.

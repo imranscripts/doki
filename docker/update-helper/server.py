@@ -849,24 +849,26 @@ def page_html():
   <title>Doki Update Helper</title>
   <style>
     :root {
-      color-scheme: light;
+      color-scheme: dark;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      --bg: #f6f7f3;
-      --surface: #ffffff;
-      --surface-soft: #f0f2ec;
-      --border: #d8ddd0;
-      --border-strong: #bbc4b3;
-      --text: #20241f;
-      --muted: #667064;
-      --green: #1f7a4d;
-      --green-soft: #e7f3eb;
-      --amber: #986000;
-      --amber-soft: #fff3d6;
-      --red: #b42318;
-      --red-soft: #fde8e5;
-      --blue: #2c5d8f;
-      --blue-soft: #e7f0f8;
-      --shadow: 0 16px 42px rgba(37, 45, 36, .10);
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-soft: #21262d;
+      --border: #30363d;
+      --border-strong: #3b434d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --green: #7ee787;
+      --green-strong: #238636;
+      --green-soft: #0f2d1d;
+      --amber: #d29922;
+      --amber-soft: #332600;
+      --red: #ff7b72;
+      --red-strong: #da3633;
+      --red-soft: #3b1717;
+      --blue: #58a6ff;
+      --blue-soft: #10233a;
+      --shadow: 0 14px 34px rgba(1, 4, 9, .35);
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--text); }
@@ -889,22 +891,22 @@ def page_html():
     select, input { width: 100%; }
     button { cursor: pointer; font-weight: 700; white-space: nowrap; }
     button.secondary { background: var(--surface-soft); }
-    button.primary { background: var(--green); border-color: var(--green); color: #ffffff; }
-    button.danger { background: var(--red); border-color: var(--red); color: #ffffff; }
+    button.primary { background: var(--green-strong); border-color: #2ea043; color: #ffffff; }
+    button.danger { background: var(--red-strong); border-color: #f85149; color: #ffffff; }
     button:disabled, input:disabled { opacity: .55; cursor: not-allowed; }
     pre {
       white-space: pre-wrap;
       word-break: break-word;
-      background: #fbfcf9;
+      background: #0d1117;
       border: 1px solid var(--border);
       padding: 12px;
       border-radius: 7px;
       max-height: 280px;
       overflow: auto;
-      color: #30362f;
+      color: var(--text);
     }
     ul { margin: 0; padding-left: 19px; }
-    li { margin: 5px 0; color: #30362f; }
+    li { margin: 5px 0; color: #c9d1d9; }
     .eyebrow { margin: 0 0 5px; color: var(--green); font-size: 12px; font-weight: 800; }
     .muted { color: var(--muted); }
     .ok { color: var(--green); }
@@ -921,9 +923,9 @@ def page_html():
       background: var(--surface);
       color: var(--muted);
     }
-    .badge.ok { background: var(--green-soft); border-color: #b8d8c1; color: var(--green); }
-    .badge.warn { background: var(--amber-soft); border-color: #ead29c; color: var(--amber); }
-    .badge.bad { background: var(--red-soft); border-color: #efb8b3; color: var(--red); }
+    .badge.ok { background: var(--green-soft); border-color: #1f6f43; color: var(--green); }
+    .badge.warn { background: var(--amber-soft); border-color: #8a6a18; color: var(--amber); }
+    .badge.bad { background: var(--red-soft); border-color: #7d2a28; color: var(--red); }
     .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
     .panel {
       background: var(--surface);
@@ -931,7 +933,7 @@ def page_html():
       border-radius: 8px;
       padding: 16px;
       min-width: 0;
-      box-shadow: 0 1px 0 rgba(37, 45, 36, .04);
+      box-shadow: 0 1px 0 rgba(255, 255, 255, .03);
     }
     .span-3 { grid-column: span 3; }
     .span-4 { grid-column: span 4; }
@@ -943,9 +945,6 @@ def page_html():
     .key { color: var(--muted); }
     .value { overflow-wrap: anywhere; font-weight: 620; }
     .status-board {
-      position: sticky;
-      top: 0;
-      z-index: 5;
       background: var(--surface);
       border: 1px solid var(--border);
       border-left: 5px solid var(--blue);
@@ -963,19 +962,19 @@ def page_html():
     .status-meta { margin: 5px 0 0; color: var(--muted); }
     .status-percent { min-width: 76px; text-align: right; font-size: 24px; font-weight: 850; color: var(--blue); }
     .progress-track { height: 13px; border-radius: 999px; background: var(--surface-soft); overflow: hidden; margin-top: 14px; border: 1px solid var(--border); }
-    .progress-fill { height: 100%; width: 0; background: var(--green); transition: width .25s ease; }
+    .progress-fill { height: 100%; width: 0; background: var(--blue); transition: width .25s ease; }
     .status-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 9px; color: var(--muted); font-size: 13px; }
     .target-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
     .actions { display: grid; gap: 10px; }
     .action-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .hint { min-height: 20px; color: var(--muted); font-size: 13px; line-height: 1.45; }
-    .notice { background: var(--blue-soft); border: 1px solid #c7d9ea; border-radius: 7px; padding: 11px; color: #244a72; font-size: 13px; line-height: 1.45; }
-    .notice.warn { background: var(--amber-soft); border-color: #ead29c; color: var(--amber); }
-    .notice.bad { background: var(--red-soft); border-color: #efb8b3; color: var(--red); }
+    .notice { background: var(--blue-soft); border: 1px solid #254d77; border-radius: 7px; padding: 11px; color: #c9d1d9; font-size: 13px; line-height: 1.45; }
+    .notice.warn { background: var(--amber-soft); border-color: #8a6a18; color: #f0c36a; }
+    .notice.bad { background: var(--red-soft); border-color: #7d2a28; color: var(--red); }
     .review-head { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
     .review-summary { margin-top: 4px; color: var(--muted); }
     .impact-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 14px 0; }
-    .impact-cell { padding: 11px; border-right: 1px solid var(--border); background: #fbfcf9; }
+    .impact-cell { padding: 11px; border-right: 1px solid var(--border); background: #0d1117; }
     .impact-cell:last-child { border-right: 0; }
     .impact-label { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
     .impact-value { font-weight: 800; }
