@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "product": "doki",
-  "currentVersion": "1.2.6",
+  "currentVersion": "1.2.7",
   "fallbackVersion": "1.0.0",
   "source": {
     "type": "git",
@@ -10,9 +10,50 @@
   },
   "releases": [
     {
+      "version": "1.2.7",
+      "tag": "v1.2.7",
+      "status": "current",
+      "channel": "stable",
+      "baseVersion": "1.2.6",
+      "commit": null,
+      "releasedAt": "2026-06-08T23:22:37+02:00",
+      "schemaVersion": 17,
+      "summary": "Polishes the Doki Updates helper interface.",
+      "requirements": {
+        "requiresRestart": true,
+        "requiresRebuild": true,
+        "requiresSetupCheck": false
+      },
+      "risk": {
+        "destructive": false,
+        "destructiveChanges": [],
+        "databaseMigrations": [
+          {
+            "scope": "global",
+            "from": 17,
+            "to": 17,
+            "summary": "No global Doki schema migration.",
+            "destructive": false
+          }
+        ]
+      },
+      "changes": [
+        "Adds a prominent sticky update status panel with progress near the top of the page.",
+        "Reworks the helper layout into clearer Current, Health, Target, Readiness, Release Review, Apply, and Job Details areas.",
+        "Adds target-specific confirmation hints such as Type 1.2.7.",
+        "Disables the confirmation field for non-destructive updates.",
+        "Shows no-op database migration entries as no schema change.",
+        "Keeps database schema unchanged at version 17."
+      ],
+      "operatorNotes": [
+        "Use this release to test the polished update helper interface from a 1.2.6 installation.",
+        "No destructive changes are declared for this release."
+      ]
+    },
+    {
       "version": "1.2.6",
       "tag": "v1.2.6",
-      "status": "current",
+      "status": "stable",
       "channel": "stable",
       "baseVersion": "1.2.5",
       "commit": null,

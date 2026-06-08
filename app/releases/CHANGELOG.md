@@ -1,5 +1,26 @@
 # Doki Changelog
 
+## 1.2.7 - 2026-06-08
+
+Polishes the Doki Updates helper interface.
+
+### Changed
+
+- Added a prominent sticky update status panel with progress near the top of the page.
+- Reworked the helper layout into clearer Current, Health, Target, Readiness, Release Review, Apply, and Job Details areas.
+- Added target-specific confirmation hints such as `Type 1.2.7`.
+- Disabled the confirmation field for non-destructive updates.
+- Made no-op database migration entries read as no schema change.
+
+### Database
+
+- Global Doki schema remains at version 17.
+- No destructive database migration is declared.
+
+### Destructive Changes
+
+- None declared.
+
 ## 1.2.6 - 2026-06-08
 
 Makes the Doki Updates page fetch stable releases automatically.

@@ -848,85 +848,227 @@ def page_html():
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Doki Update Helper</title>
   <style>
-    :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body { margin: 0; background: #0d1117; color: #e6edf3; }
-    main { max-width: 1180px; margin: 0 auto; padding: 28px; }
-    header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 22px; }
-    h1 { margin: 0; font-size: 28px; }
-    h2 { margin: 0 0 12px; font-size: 15px; }
-    p { color: #9da7b3; line-height: 1.5; }
-    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
-    .panel { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; min-width: 0; }
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --bg: #f6f7f3;
+      --surface: #ffffff;
+      --surface-soft: #f0f2ec;
+      --border: #d8ddd0;
+      --border-strong: #bbc4b3;
+      --text: #20241f;
+      --muted: #667064;
+      --green: #1f7a4d;
+      --green-soft: #e7f3eb;
+      --amber: #986000;
+      --amber-soft: #fff3d6;
+      --red: #b42318;
+      --red-soft: #fde8e5;
+      --blue: #2c5d8f;
+      --blue-soft: #e7f0f8;
+      --shadow: 0 16px 42px rgba(37, 45, 36, .10);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    main { max-width: 1240px; margin: 0 auto; padding: 24px; }
+    header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 18px; }
+    h1 { margin: 0; font-size: 27px; line-height: 1.1; letter-spacing: 0; }
+    h2 { margin: 0 0 12px; font-size: 15px; line-height: 1.25; letter-spacing: 0; }
+    h3 { margin: 0; font-size: 17px; line-height: 1.3; letter-spacing: 0; }
+    p { color: var(--muted); line-height: 1.5; margin: 8px 0 0; }
+    label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 13px; font-weight: 650; }
+    button, select, input {
+      min-height: 40px;
+      border-radius: 7px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      padding: 9px 11px;
+    }
+    select, input { width: 100%; }
+    button { cursor: pointer; font-weight: 700; white-space: nowrap; }
+    button.secondary { background: var(--surface-soft); }
+    button.primary { background: var(--green); border-color: var(--green); color: #ffffff; }
+    button.danger { background: var(--red); border-color: var(--red); color: #ffffff; }
+    button:disabled, input:disabled { opacity: .55; cursor: not-allowed; }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #fbfcf9;
+      border: 1px solid var(--border);
+      padding: 12px;
+      border-radius: 7px;
+      max-height: 280px;
+      overflow: auto;
+      color: #30362f;
+    }
+    ul { margin: 0; padding-left: 19px; }
+    li { margin: 5px 0; color: #30362f; }
+    .eyebrow { margin: 0 0 5px; color: var(--green); font-size: 12px; font-weight: 800; }
+    .muted { color: var(--muted); }
+    .ok { color: var(--green); }
+    .warn { color: var(--amber); }
+    .bad { color: var(--red); }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 750;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+    }
+    .badge.ok { background: var(--green-soft); border-color: #b8d8c1; color: var(--green); }
+    .badge.warn { background: var(--amber-soft); border-color: #ead29c; color: var(--amber); }
+    .badge.bad { background: var(--red-soft); border-color: #efb8b3; color: var(--red); }
+    .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      min-width: 0;
+      box-shadow: 0 1px 0 rgba(37, 45, 36, .04);
+    }
+    .span-3 { grid-column: span 3; }
     .span-4 { grid-column: span 4; }
-    .span-6 { grid-column: span 6; }
+    .span-5 { grid-column: span 5; }
+    .span-7 { grid-column: span 7; }
     .span-8 { grid-column: span 8; }
     .span-12 { grid-column: span 12; }
-    .kv { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px 12px; font-size: 14px; }
-    .key { color: #9da7b3; }
-    .value { overflow-wrap: anywhere; }
-    .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 9px; font-size: 12px; border: 1px solid #30363d; background: #0d1117; }
-    .ok { color: #7ee787; }
-    .warn { color: #ffa657; }
-    .bad { color: #ff7b72; }
-    button, select, input { border-radius: 7px; border: 1px solid #30363d; background: #21262d; color: #e6edf3; font: inherit; padding: 9px 11px; }
-    button { cursor: pointer; font-weight: 650; }
-    button.primary { background: #238636; border-color: #2ea043; }
-    button.danger { background: #da3633; border-color: #f85149; }
-    button:disabled { opacity: .55; cursor: not-allowed; }
-    .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    pre { white-space: pre-wrap; word-break: break-word; background: #0d1117; border: 1px solid #30363d; padding: 12px; border-radius: 8px; max-height: 300px; overflow: auto; }
-    ul { margin: 0; padding-left: 20px; }
-    li { margin: 4px 0; color: #c9d1d9; }
-    .muted { color: #9da7b3; }
-    .progress { height: 9px; border-radius: 999px; background: #30363d; overflow: hidden; }
-    .progress div { height: 100%; width: 0; background: #58a6ff; transition: width .2s ease; }
-    @media (max-width: 900px) { .span-4, .span-6, .span-8 { grid-column: span 12; } header { flex-direction: column; } main { padding: 18px; } }
+    .kv { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 8px 12px; font-size: 14px; }
+    .key { color: var(--muted); }
+    .value { overflow-wrap: anywhere; font-weight: 620; }
+    .status-board {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 5px solid var(--blue);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow);
+    }
+    .status-board.running { border-left-color: var(--green); }
+    .status-board.failed { border-left-color: var(--red); }
+    .status-board.succeeded { border-left-color: var(--green); }
+    .status-main { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+    .status-kicker { color: var(--muted); font-size: 12px; font-weight: 800; margin-bottom: 5px; }
+    .status-title { margin: 0; font-size: 20px; line-height: 1.25; }
+    .status-meta { margin: 5px 0 0; color: var(--muted); }
+    .status-percent { min-width: 76px; text-align: right; font-size: 24px; font-weight: 850; color: var(--blue); }
+    .progress-track { height: 13px; border-radius: 999px; background: var(--surface-soft); overflow: hidden; margin-top: 14px; border: 1px solid var(--border); }
+    .progress-fill { height: 100%; width: 0; background: var(--green); transition: width .25s ease; }
+    .status-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 9px; color: var(--muted); font-size: 13px; }
+    .target-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+    .actions { display: grid; gap: 10px; }
+    .action-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .hint { min-height: 20px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .notice { background: var(--blue-soft); border: 1px solid #c7d9ea; border-radius: 7px; padding: 11px; color: #244a72; font-size: 13px; line-height: 1.45; }
+    .notice.warn { background: var(--amber-soft); border-color: #ead29c; color: var(--amber); }
+    .notice.bad { background: var(--red-soft); border-color: #efb8b3; color: var(--red); }
+    .review-head { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .review-summary { margin-top: 4px; color: var(--muted); }
+    .impact-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 14px 0; }
+    .impact-cell { padding: 11px; border-right: 1px solid var(--border); background: #fbfcf9; }
+    .impact-cell:last-child { border-right: 0; }
+    .impact-label { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+    .impact-value { font-weight: 800; }
+    .review-section { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px; }
+    .empty { min-height: 120px; display: flex; align-items: center; color: var(--muted); }
+    .job-log { max-height: 240px; margin-bottom: 0; }
+    @media (max-width: 980px) {
+      .span-3, .span-4, .span-5, .span-7, .span-8 { grid-column: span 12; }
+      .impact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .impact-cell:nth-child(2) { border-right: 0; }
+      main { padding: 16px; }
+      header, .status-main { flex-direction: column; }
+      .status-percent { text-align: left; }
+    }
+    @media (max-width: 560px) {
+      .kv { grid-template-columns: 1fr; }
+      .target-row { grid-template-columns: 1fr; }
+      .impact-grid { grid-template-columns: 1fr; }
+      .impact-cell { border-right: 0; border-bottom: 1px solid var(--border); }
+      .impact-cell:last-child { border-bottom: 0; }
+    }
   </style>
 </head>
 <body>
 <main>
   <header>
     <div>
-      <h1>Doki Update Helper</h1>
-      <p>Stable-tag updates, migration dry runs, health checks, and service restart status.</p>
+      <p class="eyebrow">Doki Admin</p>
+      <h1>Updates</h1>
+      <p>Stable releases, migration checks, and restart status.</p>
     </div>
     <div class="badge" id="authStatus">Checking access</div>
   </header>
+
+  <section class="status-board" id="statusBoard">
+    <div class="status-main">
+      <div>
+        <div class="status-kicker" id="topStage">Ready</div>
+        <h2 class="status-title" id="topTitle">No update running</h2>
+        <p class="status-meta" id="topMeta">Waiting for release information.</p>
+      </div>
+      <div class="status-percent" id="topPercent">0%</div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="topProgress"></div></div>
+    <div class="status-foot">
+      <span id="topTarget">Target: n/a</span>
+      <span id="topStarted">Last job: n/a</span>
+    </div>
+  </section>
+
   <section class="grid">
-    <div class="panel span-4">
+    <div class="panel span-3">
       <h2>Current</h2>
       <div class="kv" id="currentState"></div>
     </div>
-    <div class="panel span-4">
+    <div class="panel span-3">
       <h2>Health</h2>
       <div class="kv" id="healthState"></div>
     </div>
-    <div class="panel span-4">
+    <div class="panel span-3">
       <h2>Target</h2>
-      <div class="actions">
+      <label for="targetSelect">Stable release</label>
+      <div class="target-row">
         <select id="targetSelect"></select>
-        <button id="checkBtn">Check</button>
+        <button id="checkBtn" class="secondary">Refresh</button>
       </div>
-      <p class="muted" id="targetHint"></p>
+      <p class="hint" id="targetHint">Checking latest stable release.</p>
+    </div>
+    <div class="panel span-3">
+      <h2>Readiness</h2>
+      <div class="kv" id="readinessState"></div>
     </div>
     <div class="panel span-8">
       <h2>Release Review</h2>
-      <div id="releaseReview" class="muted">Run a check to review the next stable release.</div>
+      <div id="releaseReview" class="empty">Checking latest stable release.</div>
     </div>
     <div class="panel span-4">
-      <h2>Actions</h2>
+      <h2>Apply</h2>
       <div class="actions">
-        <button id="dryRunBtn">Migration Dry Run</button>
-        <input id="confirmInput" placeholder="Confirm version">
+        <button id="dryRunBtn" class="secondary">Dry Run Migration</button>
+        <div>
+          <label id="confirmLabel" for="confirmInput">Version confirmation</label>
+          <input id="confirmInput" placeholder="Type target version">
+          <div class="hint" id="confirmHint">No target selected yet.</div>
+        </div>
         <button id="applyBtn" class="danger">Apply Update</button>
       </div>
-      <p class="muted">Apply always runs a fresh dry run first and creates a database backup before changing code.</p>
+      <p class="notice" id="applyNote">Apply runs a fresh dry run and creates a database backup before changing code.</p>
     </div>
     <div class="panel span-12">
-      <h2>Job</h2>
-      <div class="progress"><div id="jobProgress"></div></div>
-      <div id="jobState" class="muted" style="margin-top:10px;"></div>
-      <pre id="jobLog"></pre>
+      <h2>Job Details</h2>
+      <div id="jobState" class="muted"></div>
+      <pre class="job-log" id="jobLog"></pre>
     </div>
   </section>
 </main>
@@ -942,6 +1084,19 @@ function text(value) { return value === null || value === undefined || value ===
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+const STAGE_LABELS = {
+  queued: 'Queued',
+  fetching: 'Fetching release data',
+  checking: 'Checking release',
+  'migration-dry-run': 'Migration dry run',
+  backup: 'Database backup',
+  'stopping-services': 'Stopping services',
+  checkout: 'Updating files',
+  'migration-apply': 'Applying migrations',
+  'starting-services': 'Restarting services',
+  complete: 'Complete',
+  failed: 'Failed'
+};
 async function api(path, options = {}) {
   const init = { ...options, headers: { 'X-Doki-Update-Token': token, ...(options.headers || {}) } };
   if (init.body && typeof init.body !== 'string') {
@@ -956,6 +1111,30 @@ async function api(path, options = {}) {
 function renderKv(id, rows) {
   el(id).innerHTML = rows.map(([k, v, cls]) => `<div class="key">${esc(k)}</div><div class="value ${cls || ''}">${esc(v)}</div>`).join('');
 }
+function formatStage(stage) {
+  return STAGE_LABELS[stage] || text(stage);
+}
+function formatDate(value) {
+  if (!value) return 'n/a';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return text(value);
+  return date.toLocaleString();
+}
+function statusClass(status) {
+  if (status === 'failed') return 'bad';
+  if (status === 'succeeded') return 'ok';
+  if (status === 'running') return 'warn';
+  return '';
+}
+function currentCheck() {
+  return latestState?.runtime?.lastCheck || null;
+}
+function selectedTargetVersion() {
+  return el('targetSelect').value || currentCheck()?.targetVersion || '';
+}
+function activeMigrations(migrations) {
+  return (migrations || []).filter(m => String(m.from ?? '') !== String(m.to ?? '') || Boolean(m.destructive));
+}
 function renderState(data) {
   latestState = data;
   el('authStatus').textContent = 'Authorized';
@@ -963,6 +1142,8 @@ function renderState(data) {
   const repo = data.repo || {};
   const health = data.health || {};
   const check = data.runtime?.lastCheck;
+  const migrations = check?.databaseMigrations || [];
+  const realMigrations = activeMigrations(migrations);
   renderKv('currentState', [
     ['Version', repo.currentVersion],
     ['Ref', repo.currentRef],
@@ -974,51 +1155,139 @@ function renderState(data) {
     ['Doki app', health.app?.ok ? `ok (${health.app.status})` : (health.app?.error || 'down'), health.app?.ok ? 'ok' : 'warn'],
     ['Compose', health.compose?.ok ? 'reachable' : (health.compose?.error || 'unavailable'), health.compose?.ok ? 'ok' : 'warn']
   ]);
+  renderKv('readinessState', [
+    ['Update', check ? (check.updateAvailable ? `${check.currentVersion} -> ${check.targetVersion}` : 'current') : 'checking'],
+    ['Local changes', repo.worktree?.clean ? 'clean' : 'blocked', repo.worktree?.clean ? 'ok' : 'bad'],
+    ['Migrations', realMigrations.length ? `${realMigrations.length} required` : 'no schema change', realMigrations.length ? 'warn' : 'ok'],
+    ['Destructive', check?.destructive ? 'yes' : 'no', check?.destructive ? 'bad' : 'ok']
+  ]);
   const select = el('targetSelect');
   const existing = select.value;
-  select.innerHTML = (repo.stableTags || []).map(t => `<option value="${esc(t.version)}">${esc(t.tag)}</option>`).join('');
+  const tags = repo.stableTags || [];
+  select.innerHTML = tags.length ? tags.map(t => `<option value="${esc(t.version)}">${esc(t.tag)}</option>`).join('') : '<option value="">No stable tags</option>';
+  const tagValues = tags.map(t => t.version);
   if (targetPinned && existing) select.value = existing;
-  else if (check?.targetVersion) select.value = check.targetVersion;
+  else if (check?.targetVersion && tagValues.includes(check.targetVersion)) select.value = check.targetVersion;
   else if (existing && existing !== repo.currentVersion) select.value = existing;
   else if (repo.latestStable?.version) select.value = repo.latestStable.version;
 
   if (check) renderReview(check);
   renderJob(data.runtime?.job);
+  updateControls();
 }
 function renderReview(check) {
   const release = check.release || {};
   const migrations = check.databaseMigrations || [];
+  const realMigrations = activeMigrations(migrations);
+  const destructiveChanges = check.destructiveChanges || [];
   const blockers = check.blockers || [];
   const changed = check.changedFiles || [];
-  el('targetHint').textContent = check.updateAvailable ? `Update available: ${check.currentVersion} -> ${check.targetVersion}` : `No newer stable release than ${check.currentVersion}.`;
+  const releaseChanges = release.changes || [];
+  el('targetHint').textContent = check.updateAvailable ? `Latest checked: ${check.currentVersion} -> ${check.targetVersion}` : `Latest checked: ${check.targetVersion}`;
+  el('releaseReview').className = '';
   el('releaseReview').innerHTML = `
-    <div class="kv">
-      <div class="key">Target</div><div class="value">${esc(check.targetTag)} (${esc((check.targetCommit || '').slice(0, 12))})</div>
-      <div class="key">Summary</div><div class="value">${esc(release.summary || 'No summary')}</div>
-      <div class="key">Restart</div><div class="value ${check.requirements?.requiresRestart ? 'warn' : 'ok'}">${check.requirements?.requiresRestart ? 'required' : 'not required'}</div>
-      <div class="key">Rebuild</div><div class="value ${check.requirements?.requiresRebuild ? 'warn' : 'ok'}">${check.requirements?.requiresRebuild ? 'required' : 'not required'}</div>
-      <div class="key">Destructive</div><div class="value ${check.destructive ? 'bad' : 'ok'}">${check.destructive ? 'yes' : 'no'}</div>
-      <div class="key">Blocked</div><div class="value ${check.blocked ? 'bad' : 'ok'}">${check.blocked ? 'yes' : 'no'}</div>
+    <div class="review-head">
+      <div>
+        <h3>${esc(check.targetTag)} ${check.updateAvailable ? `from ${esc(check.currentVersion)}` : ''}</h3>
+        <div class="review-summary">${esc(release.summary || 'No summary')}</div>
+      </div>
+      <span class="badge ${check.blocked ? 'bad' : check.updateAvailable ? 'ok' : ''}">${esc(check.blocked ? 'Blocked' : check.updateAvailable ? 'Update available' : 'Current')}</span>
     </div>
-    <h2 style="margin-top:16px;">Migrations</h2>
-    ${migrations.length ? `<ul>${migrations.map(m => `<li>${esc(m.scope || 'global')}: ${esc(m.summary || '')}</li>`).join('')}</ul>` : '<p class="muted">No migrations declared.</p>'}
-    <h2 style="margin-top:16px;">Blockers</h2>
-    ${blockers.length ? `<ul>${blockers.map(b => `<li>${esc(b.status)} ${esc(b.path)} - ${esc(b.reason)}</li>`).join('')}</ul>` : '<p class="muted">No blocking local changes.</p>'}
-    <h2 style="margin-top:16px;">Changed Files</h2>
-    ${changed.length ? `<pre>${esc(changed.slice(0, 120).join('\\n'))}</pre>` : '<p class="muted">No file changes for this target.</p>'}
-    ${check.changelog ? `<h2 style="margin-top:16px;">Changelog</h2><pre>${esc(check.changelog)}</pre>` : ''}
+    <div class="impact-grid">
+      <div class="impact-cell">
+        <div class="impact-label">Restart</div>
+        <div class="impact-value ${check.requirements?.requiresRestart ? 'warn' : 'ok'}">${check.requirements?.requiresRestart ? 'required' : 'not required'}</div>
+      </div>
+      <div class="impact-cell">
+        <div class="impact-label">Rebuild</div>
+        <div class="impact-value ${check.requirements?.requiresRebuild ? 'warn' : 'ok'}">${check.requirements?.requiresRebuild ? 'required' : 'not required'}</div>
+      </div>
+      <div class="impact-cell">
+        <div class="impact-label">Migration</div>
+        <div class="impact-value ${realMigrations.length ? 'warn' : 'ok'}">${realMigrations.length ? `${realMigrations.length} required` : 'no schema change'}</div>
+      </div>
+      <div class="impact-cell">
+        <div class="impact-label">Destructive</div>
+        <div class="impact-value ${check.destructive ? 'bad' : 'ok'}">${check.destructive ? 'yes' : 'no'}</div>
+      </div>
+    </div>
+    ${releaseChanges.length ? `<div class="review-section"><h2>Changes</h2><ul>${releaseChanges.map(item => `<li>${esc(item)}</li>`).join('')}</ul></div>` : ''}
+    <div class="review-section">
+      <h2>Migrations</h2>
+      ${migrations.length ? `<ul>${migrations.map(m => `<li>${esc(m.scope || 'global')}: ${esc(m.summary || '')}</li>`).join('')}</ul>` : '<p class="muted">No migrations declared.</p>'}
+    </div>
+    ${destructiveChanges.length ? `<div class="review-section"><h2>Destructive Changes</h2><ul>${destructiveChanges.map(item => `<li>${esc(item)}</li>`).join('')}</ul></div>` : ''}
+    <div class="review-section">
+      <h2>Blockers</h2>
+      ${blockers.length ? `<ul>${blockers.map(b => `<li>${esc(b.status)} ${esc(b.path)} - ${esc(b.reason)}</li>`).join('')}</ul>` : '<p class="muted">No blocking local changes.</p>'}
+    </div>
+    <div class="review-section">
+      <h2>Changed Files</h2>
+      ${changed.length ? `<pre>${esc(changed.slice(0, 120).join('\\n'))}</pre>` : '<p class="muted">No file changes for this target.</p>'}
+    </div>
+    ${check.changelog ? `<div class="review-section"><h2>Changelog</h2><pre>${esc(check.changelog)}</pre></div>` : ''}
   `;
 }
-function renderJob(job) {
+function renderStatusBoard(job) {
+  const check = currentCheck();
+  const board = el('statusBoard');
+  const progress = job ? Math.max(0, Math.min(100, Number(job.progress || 0))) : 0;
+  board.className = `status-board ${job ? job.status || '' : ''}`;
+  el('topProgress').style.width = `${progress}%`;
+  el('topPercent').textContent = job ? `${progress}%` : (check?.updateAvailable ? 'Ready' : '0%');
+
   if (!job) {
-    el('jobProgress').style.width = '0%';
+    el('topStage').textContent = check ? 'Release checked' : 'Ready';
+    el('topTitle').textContent = check?.updateAvailable ? `Ready to update to ${check.targetVersion}` : 'No update running';
+    el('topMeta').textContent = check ? (check.updateAvailable ? (check.release?.summary || 'Release metadata loaded.') : `Latest stable is ${check.targetTag}.`) : 'Waiting for release information.';
+    el('topTarget').textContent = `Target: ${check?.targetTag || 'n/a'}`;
+    el('topStarted').textContent = `Checked: ${formatDate(check?.checkedAt)}`;
+    return;
+  }
+
+  const stage = formatStage(job.stage);
+  el('topStage').textContent = text(job.status).toUpperCase();
+  el('topTitle').textContent = job.status === 'running' ? stage : job.status === 'succeeded' ? 'Update completed' : job.status === 'failed' ? 'Update failed' : stage;
+  el('topMeta').textContent = job.error || `Target ${job.targetVersion || check?.targetVersion || 'n/a'}`;
+  el('topTarget').textContent = `Target: ${job.targetVersion || check?.targetVersion || 'n/a'}`;
+  el('topStarted').textContent = `Started: ${formatDate(job.startedAt)}`;
+}
+function renderJob(job) {
+  renderStatusBoard(job);
+  if (!job) {
     el('jobState').textContent = 'No job has run yet.';
     el('jobLog').textContent = '';
     return;
   }
-  el('jobProgress').style.width = `${job.progress || 0}%`;
-  el('jobState').innerHTML = `${esc(job.kind)} / ${esc(job.stage)} / <span class="${job.status === 'failed' ? 'bad' : job.status === 'succeeded' ? 'ok' : 'warn'}">${esc(job.status)}</span>${job.error ? ': ' + esc(job.error) : ''}`;
+  const cls = statusClass(job.status);
+  el('jobState').innerHTML = `<span class="badge ${cls}">${esc(job.status)}</span> ${esc(formatStage(job.stage))}${job.error ? ': ' + esc(job.error) : ''}`;
   el('jobLog').textContent = (job.logs || []).map(l => `${l.at} ${l.message}`).join('\\n');
+}
+function updateControls() {
+  const check = currentCheck();
+  const target = selectedTargetVersion();
+  const running = jobIsRunning();
+  const blocked = Boolean(check?.blocked);
+  const destructive = Boolean(check?.destructive);
+  const confirmValue = el('confirmInput').value.trim();
+  const confirmationMatches = check && (confirmValue === check.targetVersion || confirmValue === check.targetTag);
+
+  el('confirmLabel').textContent = destructive ? 'Confirm destructive update' : 'Version confirmation';
+  el('confirmInput').placeholder = target ? `Type ${target}` : 'Type target version';
+  el('confirmInput').disabled = !destructive;
+  if (!destructive && el('confirmInput').value) el('confirmInput').value = '';
+  el('confirmHint').textContent = destructive
+    ? `Required: type ${check?.targetVersion || target} or ${check?.targetTag || 'the target tag'}.`
+    : (target ? `Not required for ${target}. Destructive updates will ask for the exact version.` : 'No target selected yet.');
+
+  el('dryRunBtn').disabled = running || !target || blocked;
+  el('applyBtn').disabled = running || !check || !check.updateAvailable || blocked || (destructive && !confirmationMatches);
+  el('applyNote').className = blocked ? 'notice bad' : destructive ? 'notice warn' : 'notice';
+  el('applyNote').textContent = blocked
+    ? 'Local changes are blocking this update.'
+    : destructive
+      ? 'This release is marked destructive. The exact version confirmation is required before apply.'
+      : 'Apply runs a fresh dry run and creates a database backup before changing code.';
 }
 async function refresh() {
   if (!token) {
@@ -1045,12 +1314,13 @@ async function postAction(path, body) {
 function jobIsRunning() {
   return latestState?.runtime?.job?.status === 'running';
 }
-async function checkLatest(options = {}) {
+async function checkTarget(targetVersion = '', options = {}) {
   if (!token || checkInFlight || jobIsRunning()) return;
   checkInFlight = true;
-  targetPinned = false;
+  if (!options.keepPinned) targetPinned = false;
   try {
-    const data = await api('/api/check', { method: 'POST', body: {} });
+    const body = targetVersion ? { targetVersion } : {};
+    const data = await api('/api/check', { method: 'POST', body });
     renderState(data.state || data);
   } catch (err) {
     if (options.silent) {
@@ -1062,7 +1332,15 @@ async function checkLatest(options = {}) {
     checkInFlight = false;
   }
 }
-el('targetSelect').addEventListener('change', () => { targetPinned = true; });
+function checkLatest(options = {}) {
+  return checkTarget('', options);
+}
+el('targetSelect').addEventListener('change', () => {
+  targetPinned = true;
+  checkTarget(el('targetSelect').value, { silent: true, keepPinned: true });
+  updateControls();
+});
+el('confirmInput').addEventListener('input', updateControls);
 el('checkBtn').addEventListener('click', () => checkLatest());
 el('dryRunBtn').addEventListener('click', () => postAction('/api/migration-dry-run', { targetVersion: el('targetSelect').value }));
 el('applyBtn').addEventListener('click', () => postAction('/api/apply', { targetVersion: el('targetSelect').value, confirmVersion: el('confirmInput').value.trim() }));
@@ -1072,7 +1350,10 @@ async function boot() {
 }
 boot();
 setInterval(refresh, 3000);
-setInterval(() => checkLatest({ silent: true }), 300000);
+setInterval(() => {
+  const target = targetPinned ? el('targetSelect').value : '';
+  checkTarget(target, { silent: true, keepPinned: targetPinned });
+}, 300000);
 </script>
 </body>
 </html>"""
