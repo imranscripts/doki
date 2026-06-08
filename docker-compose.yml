@@ -11,6 +11,7 @@ services:
       - DOKI_GO_ORCH_ENABLED=${DOKI_GO_ORCH_ENABLED:-1}
       - DOKI_ORCH_URL=${DOKI_ORCH_URL:-http://go-orchestrator:8098}
       - DOKI_ORCH_TOKEN=${DOKI_ORCH_TOKEN:-dev-insecure}
+      - DOKI_UPDATE_HELPER_URL=${DOKI_UPDATE_HELPER_URL:-http://localhost:8100}
     volumes:
       - ./app:/var/www/html:rw,z
       - doki-sessions:/var/www/sessions
@@ -22,6 +23,30 @@ services:
       - /:/host_root:ro  # Gives read-only access to the entire host filesystem
     ports:
       - "8099:80"
+    restart: unless-stopped
+    privileged: true
+
+  update-helper:
+    build:
+      context: .
+      dockerfile: docker/update-helper/Dockerfile
+    container_name: doki-update-helper
+    environment:
+      - DOKI_REPO_ROOT=/workspace
+      - DOKI_UPDATE_PORT=8100
+      - DOKI_UPDATE_REMOTE=origin
+      - DOKI_UPDATE_CORE_SERVICES=php-app,go-orchestrator
+      - DOKI_UPDATE_TOKEN_FILE=/workspace/app/data/update-helper/tokens.json
+      - DOKI_UPDATE_STATE_FILE=/workspace/app/data/update-helper/state.json
+      - DOKI_DB_PATH=/workspace/app/data/doki.db
+      - DOKI_APP_HEALTH_URL=http://php-app/
+      - GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=accept-new
+    volumes:
+      - ./:/workspace:rw,z
+      - ${HOME}/.ssh:/root/.ssh:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "127.0.0.1:${DOKI_UPDATE_HELPER_PORT:-8100}:8100"
     restart: unless-stopped
     privileged: true
 

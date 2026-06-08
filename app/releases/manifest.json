@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "product": "doki",
-  "currentVersion": "1.1.0",
+  "currentVersion": "1.2.0",
   "fallbackVersion": "1.0.0",
   "source": {
     "type": "git",
@@ -10,13 +10,57 @@
   },
   "releases": [
     {
+      "version": "1.2.0",
+      "tag": "v1.2.0",
+      "status": "current",
+      "channel": "stable",
+      "baseVersion": "1.1.0",
+      "commit": null,
+      "releasedAt": "2026-06-08T18:39:50+02:00",
+      "schemaVersion": 17,
+      "summary": "Adds the Doki Updates admin surface and host-side stable release updater.",
+      "requirements": {
+        "requiresRestart": true,
+        "requiresRebuild": true,
+        "requiresSetupCheck": false
+      },
+      "risk": {
+        "destructive": false,
+        "destructiveChanges": [],
+        "databaseMigrations": [
+          {
+            "scope": "global",
+            "from": 17,
+            "to": 17,
+            "summary": "No global Doki schema migration.",
+            "destructive": false
+          }
+        ]
+      },
+      "changes": [
+        "Adds a super-admin Doki Updates page that opens the update helper with a short-lived token.",
+        "Adds a localhost-only update-helper service for stable tag checks, Doki health, migration dry-runs, and apply progress.",
+        "Restricts updater discovery to stable semantic version tags such as v1.2.0.",
+        "Blocks updates when managed files have local changes.",
+        "Runs migration dry-runs against a copied SQLite database before applying updates.",
+        "Creates a live database backup before applying an update.",
+        "Keeps updater token/state files and SQLite WAL sidecars out of source control."
+      ],
+      "operatorNotes": [
+        "Only super-admins can open the Doki Updates page.",
+        "The update-helper service is exposed on 127.0.0.1:8100 by default.",
+        "This release adds a new Compose service, so rebuild/restart the stack after installing it.",
+        "No destructive changes are declared for this release."
+      ]
+    },
+    {
       "version": "1.1.0",
       "tag": "v1.1.0",
-      "status": "current",
+      "status": "stable",
       "channel": "stable",
       "baseVersion": "1.0.0",
       "commit": null,
-      "releasedAt": null,
+      "releasedAt": "2026-06-08T14:50:32+02:00",
       "schemaVersion": 17,
       "summary": "Adds the Logger core app and improves first-run setup/start ergonomics.",
       "requirements": {

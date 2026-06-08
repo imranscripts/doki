@@ -1,5 +1,33 @@
 # Doki Changelog
 
+## 1.2.0 - 2026-06-08
+
+Adds Doki's stable-tag update flow.
+
+### Added
+
+- Added a super-admin Doki Updates page.
+- Added a localhost-only `update-helper` service for release checks, health polling, migration dry-runs, and update progress.
+- Added short-lived updater access tokens minted from Doki for super-admins.
+- Added stable semantic-version tag discovery for releases such as `v1.2.0`.
+- Added a CLI migration probe for dry-run and apply stages.
+
+### Changed
+
+- Updates are blocked when managed files have local changes.
+- Migration dry-runs run against a copied SQLite database before any real update is applied.
+- Update apply creates a live database backup before changing code or running real migrations.
+- Updater token/state files and SQLite WAL sidecars are ignored by Git.
+
+### Database
+
+- Global Doki schema remains at version 17.
+- No destructive database migration is declared.
+
+### Destructive Changes
+
+- None declared.
+
 ## 1.1.0 - 2026-06-08
 
 Current release after the `1.0.0` baseline.

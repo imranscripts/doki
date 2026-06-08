@@ -19,6 +19,7 @@
 /app/data/workspaces
 /app/data/studio-marketplace
 /app/data/templates
+/app/data/update-helper
 /app/.ssh
 /app/playwright-jobs
 /app/playwright-report
@@ -31,4 +32,6 @@
 .codex
 .env
 *.sqlite
+*.db-shm
+*.db-wal
 *.Identifier

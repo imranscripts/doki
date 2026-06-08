@@ -11,6 +11,22 @@ class Database {
     private const DB_PATH = __DIR__ . '/../data/doki.db';
     private const SCHEMA_VERSION = 17; // Bumped for Workflows Studio AI apply/revert versions
 
+    public static function getDatabasePath(): string {
+        return self::DB_PATH;
+    }
+
+    public static function getDeclaredSchemaVersion(): int {
+        return self::SCHEMA_VERSION;
+    }
+
+    public static function getAppliedSchemaVersion(?PDO $db = null): int {
+        $db = $db ?? self::getInstance();
+        $stmt = $db->query("SELECT MAX(version) as version FROM schema_version");
+        $row = $stmt->fetch();
+        $stmt->closeCursor();
+        return (int)($row['version'] ?? 0);
+    }
+
     public static function getInstance(): PDO {
         if (self::$instance === null) {
             // Ensure data directory exists

@@ -170,6 +170,17 @@ class SystemModuleRegistry {
                 'description' => 'System-wide Doki modules and security settings.',
                 'dividerBefore' => true,
             ],
+            'doki.update' => [
+                'id' => 'doki.update',
+                'label' => 'Doki Updates',
+                'navLabel' => 'Updates',
+                'icon' => 'fa-cloud-arrow-down',
+                'path' => 'admin/updates.php',
+                'roles' => ['super-admin'],
+                'sidebarVisible' => true,
+                'defaultSection' => self::SECTION_ADMINISTRATION,
+                'description' => 'Stable release updates, migration dry runs, and updater health.',
+            ],
             'admin-apps' => [
                 'id' => 'admin-apps',
                 'label' => 'App Management',
