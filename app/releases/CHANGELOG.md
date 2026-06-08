@@ -1,5 +1,23 @@
 # Doki Changelog
 
+## 1.2.9 - 2026-06-08
+
+Removes the update status panel side accent.
+
+### Changed
+
+- Removed the left-border accent from the update status/progress panel.
+- Removed state-specific `border-left-color` styling from the update helper.
+
+### Database
+
+- Global Doki schema remains at version 17.
+- No destructive database migration is declared.
+
+### Destructive Changes
+
+- None declared.
+
 ## 1.2.8 - 2026-06-08
 
 Corrects the Doki Updates helper interface polish.

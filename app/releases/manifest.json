@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "product": "doki",
-  "currentVersion": "1.2.8",
+  "currentVersion": "1.2.9",
   "fallbackVersion": "1.0.0",
   "source": {
     "type": "git",
@@ -10,9 +10,47 @@
   },
   "releases": [
     {
+      "version": "1.2.9",
+      "tag": "v1.2.9",
+      "status": "current",
+      "channel": "stable",
+      "baseVersion": "1.2.8",
+      "commit": null,
+      "releasedAt": "2026-06-08T23:40:26+02:00",
+      "schemaVersion": 17,
+      "summary": "Removes the update status panel side accent.",
+      "requirements": {
+        "requiresRestart": true,
+        "requiresRebuild": true,
+        "requiresSetupCheck": false
+      },
+      "risk": {
+        "destructive": false,
+        "destructiveChanges": [],
+        "databaseMigrations": [
+          {
+            "scope": "global",
+            "from": 17,
+            "to": 17,
+            "summary": "No global Doki schema migration.",
+            "destructive": false
+          }
+        ]
+      },
+      "changes": [
+        "Removes the left-border accent from the update status/progress panel.",
+        "Removes state-specific border-left-color styling from the update helper.",
+        "Keeps database schema unchanged at version 17."
+      ],
+      "operatorNotes": [
+        "Use this release to remove the update-helper side accent introduced during UI polish.",
+        "No destructive changes are declared for this release."
+      ]
+    },
+    {
       "version": "1.2.8",
       "tag": "v1.2.8",
-      "status": "current",
+      "status": "stable",
       "channel": "stable",
       "baseVersion": "1.2.7",
       "commit": null,

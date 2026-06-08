@@ -947,15 +947,11 @@ def page_html():
     .status-board {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-left: 5px solid var(--blue);
       border-radius: 8px;
       padding: 16px;
       margin-bottom: 14px;
       box-shadow: var(--shadow);
     }
-    .status-board.running { border-left-color: var(--green); }
-    .status-board.failed { border-left-color: var(--red); }
-    .status-board.succeeded { border-left-color: var(--green); }
     .status-main { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
     .status-kicker { color: var(--muted); font-size: 12px; font-weight: 800; margin-bottom: 5px; }
     .status-title { margin: 0; font-size: 20px; line-height: 1.25; }
