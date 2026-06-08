@@ -157,12 +157,16 @@ def run_or_raise(args, cwd=REPO_ROOT, timeout=60):
     return result
 
 
+def git_command(args):
+    return ["git", "-c", f"safe.directory={REPO_ROOT}", *args]
+
+
 def git(args, timeout=60):
-    return command_result(["git", *args], timeout=timeout)
+    return command_result(git_command(args), timeout=timeout)
 
 
 def git_or_raise(args, timeout=60):
-    return run_or_raise(["git", *args], timeout=timeout)
+    return run_or_raise(git_command(args), timeout=timeout)
 
 
 def parse_semver_tag(tag):
@@ -516,7 +520,7 @@ def create_release_tree(target_tag):
     release_root.mkdir(parents=True, exist_ok=True)
     archive_path = temp_dir / "release.tar"
     try:
-        run_or_raise(["git", "archive", "--format=tar", "-o", str(archive_path), target_tag], timeout=120)
+        git_or_raise(["archive", "--format=tar", "-o", str(archive_path), target_tag], timeout=120)
         run_or_raise(["tar", "-xf", str(archive_path), "-C", str(release_root)], cwd=temp_dir, timeout=120)
         return temp_dir, release_root
     except Exception:

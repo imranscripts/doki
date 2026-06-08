@@ -1,5 +1,23 @@
 # Doki Changelog
 
+## 1.2.2 - 2026-06-08
+
+Fixes updater Git safety handling for Docker-mounted workspaces.
+
+### Fixed
+
+- The update-helper now passes Git's `safe.directory` option for every Git command.
+- This prevents Docker-mounted Doki checkouts from failing with Git dubious ownership errors at `/workspace`.
+
+### Database
+
+- Global Doki schema remains at version 17.
+- No destructive database migration is declared.
+
+### Destructive Changes
+
+- None declared.
+
 ## 1.2.1 - 2026-06-08
 
 Patch release for exercising the Doki stable updater flow.

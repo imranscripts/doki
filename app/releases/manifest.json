@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "product": "doki",
-  "currentVersion": "1.2.1",
+  "currentVersion": "1.2.2",
   "fallbackVersion": "1.0.0",
   "source": {
     "type": "git",
@@ -10,9 +10,48 @@
   },
   "releases": [
     {
+      "version": "1.2.2",
+      "tag": "v1.2.2",
+      "status": "current",
+      "channel": "stable",
+      "baseVersion": "1.2.1",
+      "commit": null,
+      "releasedAt": "2026-06-08T18:54:17+02:00",
+      "schemaVersion": 17,
+      "summary": "Fixes updater Git safety handling for Docker-mounted workspaces.",
+      "requirements": {
+        "requiresRestart": true,
+        "requiresRebuild": true,
+        "requiresSetupCheck": false
+      },
+      "risk": {
+        "destructive": false,
+        "destructiveChanges": [],
+        "databaseMigrations": [
+          {
+            "scope": "global",
+            "from": 17,
+            "to": 17,
+            "summary": "No global Doki schema migration.",
+            "destructive": false
+          }
+        ]
+      },
+      "changes": [
+        "Passes Git's safe.directory option for every update-helper Git command.",
+        "Prevents Docker-mounted Doki checkouts from failing with Git dubious ownership errors.",
+        "Keeps database schema unchanged at version 17."
+      ],
+      "operatorNotes": [
+        "This release fixes the update-helper on fresh installs and after the helper image is rebuilt.",
+        "Installations already on 1.2.0 may need to run the one-time safe.directory command in the helper container before fetching this release.",
+        "No destructive changes are declared for this release."
+      ]
+    },
+    {
       "version": "1.2.1",
       "tag": "v1.2.1",
-      "status": "current",
+      "status": "stable",
       "channel": "stable",
       "baseVersion": "1.2.0",
       "commit": null,
