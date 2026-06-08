@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "product": "doki",
-  "currentVersion": "1.2.4",
+  "currentVersion": "1.2.5",
   "fallbackVersion": "1.0.0",
   "source": {
     "type": "git",
@@ -10,9 +10,47 @@
   },
   "releases": [
     {
+      "version": "1.2.5",
+      "tag": "v1.2.5",
+      "status": "current",
+      "channel": "stable",
+      "baseVersion": "1.2.4",
+      "commit": null,
+      "releasedAt": "2026-06-08T19:18:50+02:00",
+      "schemaVersion": 17,
+      "summary": "Patch release for testing the fixed Doki update restart flow.",
+      "requirements": {
+        "requiresRestart": true,
+        "requiresRebuild": true,
+        "requiresSetupCheck": false
+      },
+      "risk": {
+        "destructive": false,
+        "destructiveChanges": [],
+        "databaseMigrations": [
+          {
+            "scope": "global",
+            "from": 17,
+            "to": 17,
+            "summary": "No global Doki schema migration.",
+            "destructive": false
+          }
+        ]
+      },
+      "changes": [
+        "Bumps Doki to 1.2.5 so installations on 1.2.4 can perform a real stable-tag update.",
+        "Keeps updater, restart, and migration behavior unchanged from 1.2.4.",
+        "Keeps database schema unchanged at version 17."
+      ],
+      "operatorNotes": [
+        "Use this release to test the fixed helper restart path from a 1.2.4 installation.",
+        "No destructive changes are declared for this release."
+      ]
+    },
+    {
       "version": "1.2.4",
       "tag": "v1.2.4",
-      "status": "current",
+      "status": "stable",
       "channel": "stable",
       "baseVersion": "1.2.3",
       "commit": null,

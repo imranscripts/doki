@@ -1,5 +1,23 @@
 # Doki Changelog
 
+## 1.2.5 - 2026-06-08
+
+Patch release for testing the fixed Doki update restart flow.
+
+### Changed
+
+- Bumped Doki to `1.2.5` so installations on `1.2.4` can perform a real stable-tag update.
+- Kept the updater, restart, and migration behavior unchanged from `1.2.4`.
+
+### Database
+
+- Global Doki schema remains at version 17.
+- No destructive database migration is declared.
+
+### Destructive Changes
+
+- None declared.
+
 ## 1.2.4 - 2026-06-08
 
 Fixes helper-initiated Compose restarts by preserving host repo paths and the active Compose project.
