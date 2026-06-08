@@ -1,5 +1,25 @@
 # Doki Changelog
 
+## 1.2.6 - 2026-06-08
+
+Makes the Doki Updates page fetch stable releases automatically.
+
+### Changed
+
+- The Updates page now checks for the latest stable tag when it opens.
+- The Updates page rechecks stable tags every five minutes while open.
+- The health/state refresh remains local and lightweight.
+- The target version dropdown now follows the checked latest release unless the admin manually selects another version.
+
+### Database
+
+- Global Doki schema remains at version 17.
+- No destructive database migration is declared.
+
+### Destructive Changes
+
+- None declared.
+
 ## 1.2.5 - 2026-06-08
 
 Patch release for testing the fixed Doki update restart flow.

@@ -934,6 +934,8 @@ def page_html():
 const params = new URLSearchParams(location.search);
 const token = params.get('token') || '';
 let latestState = null;
+let checkInFlight = false;
+let targetPinned = false;
 
 function el(id) { return document.getElementById(id); }
 function text(value) { return value === null || value === undefined || value === '' ? 'n/a' : String(value); }
@@ -960,6 +962,7 @@ function renderState(data) {
   el('authStatus').className = 'badge ok';
   const repo = data.repo || {};
   const health = data.health || {};
+  const check = data.runtime?.lastCheck;
   renderKv('currentState', [
     ['Version', repo.currentVersion],
     ['Ref', repo.currentRef],
@@ -974,10 +977,11 @@ function renderState(data) {
   const select = el('targetSelect');
   const existing = select.value;
   select.innerHTML = (repo.stableTags || []).map(t => `<option value="${esc(t.version)}">${esc(t.tag)}</option>`).join('');
-  if (existing) select.value = existing;
+  if (targetPinned && existing) select.value = existing;
+  else if (check?.targetVersion) select.value = check.targetVersion;
+  else if (existing && existing !== repo.currentVersion) select.value = existing;
   else if (repo.latestStable?.version) select.value = repo.latestStable.version;
 
-  const check = data.runtime?.lastCheck;
   if (check) renderReview(check);
   renderJob(data.runtime?.job);
 }
@@ -1038,11 +1042,37 @@ async function postAction(path, body) {
     alert(err.message);
   }
 }
-el('checkBtn').addEventListener('click', () => postAction('/api/check', { targetVersion: el('targetSelect').value }));
+function jobIsRunning() {
+  return latestState?.runtime?.job?.status === 'running';
+}
+async function checkLatest(options = {}) {
+  if (!token || checkInFlight || jobIsRunning()) return;
+  checkInFlight = true;
+  targetPinned = false;
+  try {
+    const data = await api('/api/check', { method: 'POST', body: {} });
+    renderState(data.state || data);
+  } catch (err) {
+    if (options.silent) {
+      el('targetHint').textContent = `Unable to check for updates: ${err.message}`;
+    } else {
+      alert(err.message);
+    }
+  } finally {
+    checkInFlight = false;
+  }
+}
+el('targetSelect').addEventListener('change', () => { targetPinned = true; });
+el('checkBtn').addEventListener('click', () => checkLatest());
 el('dryRunBtn').addEventListener('click', () => postAction('/api/migration-dry-run', { targetVersion: el('targetSelect').value }));
 el('applyBtn').addEventListener('click', () => postAction('/api/apply', { targetVersion: el('targetSelect').value, confirmVersion: el('confirmInput').value.trim() }));
-refresh();
+async function boot() {
+  await refresh();
+  await checkLatest({ silent: true });
+}
+boot();
 setInterval(refresh, 3000);
+setInterval(() => checkLatest({ silent: true }), 300000);
 </script>
 </body>
 </html>"""

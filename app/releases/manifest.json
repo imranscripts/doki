@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "product": "doki",
-  "currentVersion": "1.2.5",
+  "currentVersion": "1.2.6",
   "fallbackVersion": "1.0.0",
   "source": {
     "type": "git",
@@ -10,9 +10,49 @@
   },
   "releases": [
     {
+      "version": "1.2.6",
+      "tag": "v1.2.6",
+      "status": "current",
+      "channel": "stable",
+      "baseVersion": "1.2.5",
+      "commit": null,
+      "releasedAt": "2026-06-08T19:23:41+02:00",
+      "schemaVersion": 17,
+      "summary": "Makes the Doki Updates page fetch stable releases automatically.",
+      "requirements": {
+        "requiresRestart": true,
+        "requiresRebuild": true,
+        "requiresSetupCheck": false
+      },
+      "risk": {
+        "destructive": false,
+        "destructiveChanges": [],
+        "databaseMigrations": [
+          {
+            "scope": "global",
+            "from": 17,
+            "to": 17,
+            "summary": "No global Doki schema migration.",
+            "destructive": false
+          }
+        ]
+      },
+      "changes": [
+        "Checks for the latest stable tag automatically when the Updates page opens.",
+        "Rechecks stable tags every five minutes while the Updates page is open.",
+        "Keeps the health/state refresh local and lightweight.",
+        "Keeps the target version dropdown aligned with the checked latest release unless the admin manually selects another version.",
+        "Keeps database schema unchanged at version 17."
+      ],
+      "operatorNotes": [
+        "Use this release to test the automatic stable-tag discovery flow from a 1.2.5 installation.",
+        "No destructive changes are declared for this release."
+      ]
+    },
+    {
       "version": "1.2.5",
       "tag": "v1.2.5",
-      "status": "current",
+      "status": "stable",
       "channel": "stable",
       "baseVersion": "1.2.4",
       "commit": null,
