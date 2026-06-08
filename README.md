@@ -48,8 +48,8 @@ You need:
 From the repo root:
 
 ```bash
-./setup.sh
 ./start.sh
+./setup.sh
 ```
 
 Then open:
@@ -132,7 +132,7 @@ That is powerful and convenient for local orchestration, but it also means you s
 
 - The app listens on `http://localhost:8099`
 - The orchestrator host port is auto-selected and persisted, defaulting to `8098` when available
-- The host-side setup flow uses your local PHP CLI, so missing PHP extensions on the host will block `./setup.sh`
+- The setup flow runs inside the `php-app` container, so run `./start.sh` before `./setup.sh`
 
 ## Status
 

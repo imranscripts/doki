@@ -32,10 +32,17 @@ $printLine = static function(string $line = ''): void {
 $printLine('Doki setup');
 $printLine('==========');
 $printLine('Mode: ' . ($checkOnly ? 'check' : ($rotateKeys ? 'init + rotate keys' : 'init')));
-$printLine('Install state: ' . ($status['install']['state'] ?? 'unknown'));
+$installState = (string)($status['install']['state'] ?? 'unknown');
+$printLine('Install state: ' . $installState);
 $printLine('');
 
-if (!$checkOnly && !empty($status['stealth']['secret'])) {
+if (!$checkOnly && !$rotateKeys && $installState === OnboardingManager::STATE_COMPLETE) {
+    $printLine('Doki is already set up. Setup refreshed runtime files and checked health.');
+    $printLine('Use ./start.sh to start Doki when it is stopped.');
+    $printLine('');
+}
+
+if (!$checkOnly && ($rotateKeys || $installState !== OnboardingManager::STATE_COMPLETE) && !empty($status['stealth']['secret'])) {
     $printLine('Stealth key');
     $printLine('-----------');
     $printLine('Here is your stealth key. Keep it somewhere safe. You will need it after onboarding if you keep the stealth feature enabled.');
@@ -102,6 +109,9 @@ if ($verbose) {
     $printLine('Secrets key path: ' . (string)($status['secretsKey']['path'] ?? 'unavailable'));
 } elseif (!empty($issues)) {
     $printLine('Use ./setup.sh --verbose for full diagnostics.');
+    if ($checkOnly) {
+        $printLine('Run ./setup.sh while Doki is running to repair missing runtime state where possible.');
+    }
 }
 
 $printLine('');

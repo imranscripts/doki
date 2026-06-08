@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "product": "doki",
+  "currentVersion": "1.1.0",
+  "fallbackVersion": "1.0.0",
+  "source": {
+    "type": "git",
+    "remote": "origin",
+    "branch": "main"
+  },
+  "releases": [
+    {
+      "version": "1.1.0",
+      "status": "current",
+      "channel": "stable",
+      "baseVersion": "1.0.0",
+      "commit": null,
+      "releasedAt": null,
+      "schemaVersion": 17,
+      "summary": "Adds the Logger core app and improves first-run setup/start ergonomics.",
+      "requirements": {
+        "requiresRestart": false,
+        "requiresRebuild": false,
+        "requiresSetupCheck": true
+      },
+      "risk": {
+        "destructive": false,
+        "destructiveChanges": [],
+        "databaseMigrations": [
+          {
+            "scope": "global",
+            "from": 17,
+            "to": 17,
+            "summary": "No global Doki schema migration.",
+            "destructive": false
+          },
+          {
+            "scope": "logger-app",
+            "from": null,
+            "to": 1,
+            "summary": "Logger app creates its own tables on first use.",
+            "destructive": false
+          }
+        ]
+      },
+      "changes": [
+        "Adds Logger as a core installed app for viewing configured log files across Doki targets.",
+        "Runs setup inside the php-app container so host PHP extensions no longer block setup.",
+        "Improves start.sh and setup.sh Docker/Compose checks and startup guidance.",
+        "Refreshes README setup order to start Doki before running setup."
+      ],
+      "operatorNotes": [
+        "Run ./setup.sh after ./start.sh to refresh runtime state and health checks.",
+        "No destructive changes are declared for this release."
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "status": "baseline",
+      "channel": "stable",
+      "baseVersion": null,
+      "commit": "a9a1b7c2d1b277bed8021132f80e04bdecf6d660",
+      "releasedAt": "2026-04-12T19:42:56+02:00",
+      "schemaVersion": 17,
+      "summary": "Initial Doki release baseline from main.",
+      "requirements": {
+        "requiresRestart": false,
+        "requiresRebuild": false,
+        "requiresSetupCheck": false
+      },
+      "risk": {
+        "destructive": false,
+        "destructiveChanges": [],
+        "databaseMigrations": []
+      },
+      "changes": [
+        "Establishes the first release baseline for Doki updates.",
+        "Includes Doki admin, apps, workflows, sources, onboarding, and schema version 17."
+      ],
+      "operatorNotes": [
+        "Installs without release metadata should be treated as 1.0.0 by the updater."
+      ]
+    }
+  ]
+}

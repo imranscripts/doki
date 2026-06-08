@@ -5,6 +5,11 @@ apps:
     trustLevel: 0
     installedAt: "2026-01-01T00:00:00Z"
     installedBy: system
+  logger:
+    source: core
+    trustLevel: 0
+    installedAt: "2026-06-07T00:00:00Z"
+    installedBy: system
   image-compress:
     source: local
     installedAt: "2026-01-25T11:50:00+00:00"

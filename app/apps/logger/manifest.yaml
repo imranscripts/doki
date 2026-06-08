@@ -1,0 +1,37 @@
+# Logger App Manifest
+
+id: logger
+name: Logger
+description: Watch configured log files across Doki targets
+icon: fa-file-lines
+color: "#0f766e"
+version: 1.0.0
+enabled: true
+core: true
+
+tags:
+  - operations
+  - logs
+  - monitoring
+  - core
+
+capabilities:
+  - ui.layout
+  - auth.check_roles
+  - audit.write
+  - db.app_tables
+  - config.targets
+  - config.environments
+  - config.secrets
+  - exec.ssh
+  - exec.docker
+
+navigation:
+  - id: logs
+    label: Logs
+    icon: fa-file-lines
+    page: index.php
+
+permissions:
+  admin: [read, write, settings]
+  user: [read]
