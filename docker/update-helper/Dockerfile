@@ -18,7 +18,11 @@ RUN apt-get update && \
 WORKDIR /workspace
 
 COPY docker/update-helper/server.py /opt/doki-update-helper/server.py
+COPY docker/update-helper/entrypoint.sh /opt/doki-update-helper/entrypoint.sh
+
+RUN chmod +x /opt/doki-update-helper/entrypoint.sh
 
 EXPOSE 8100
 
+ENTRYPOINT ["/opt/doki-update-helper/entrypoint.sh"]
 CMD ["python3", "/opt/doki-update-helper/server.py"]

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "product": "doki",
-  "currentVersion": "1.2.2",
+  "currentVersion": "1.2.3",
   "fallbackVersion": "1.0.0",
   "source": {
     "type": "git",
@@ -10,9 +10,48 @@
   },
   "releases": [
     {
+      "version": "1.2.3",
+      "tag": "v1.2.3",
+      "status": "current",
+      "channel": "stable",
+      "baseVersion": "1.2.2",
+      "commit": null,
+      "releasedAt": "2026-06-08T18:57:45+02:00",
+      "schemaVersion": 17,
+      "summary": "Makes update-helper Git safety self-configuring at container startup.",
+      "requirements": {
+        "requiresRestart": true,
+        "requiresRebuild": true,
+        "requiresSetupCheck": false
+      },
+      "risk": {
+        "destructive": false,
+        "destructiveChanges": [],
+        "databaseMigrations": [
+          {
+            "scope": "global",
+            "from": 17,
+            "to": 17,
+            "summary": "No global Doki schema migration.",
+            "destructive": false
+          }
+        ]
+      },
+      "changes": [
+        "Adds an update-helper container entrypoint that marks the mounted Doki checkout as a safe Git directory.",
+        "Keeps per-command safe.directory handling as a second layer of protection.",
+        "Prevents normal installs from requiring any manual Git config command before checking for updates.",
+        "Keeps database schema unchanged at version 17."
+      ],
+      "operatorNotes": [
+        "This release requires rebuilding the update-helper image so the entrypoint is installed.",
+        "No destructive changes are declared for this release."
+      ]
+    },
+    {
       "version": "1.2.2",
       "tag": "v1.2.2",
-      "status": "current",
+      "status": "stable",
       "channel": "stable",
       "baseVersion": "1.2.1",
       "commit": null,

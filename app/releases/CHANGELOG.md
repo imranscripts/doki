@@ -1,5 +1,24 @@
 # Doki Changelog
 
+## 1.2.3 - 2026-06-08
+
+Makes update-helper Git safety self-configuring at container startup.
+
+### Fixed
+
+- Added an update-helper container entrypoint that marks the mounted Doki checkout as a safe Git directory inside the container.
+- Kept per-command `safe.directory` handling as a second layer of protection.
+- Normal installs no longer require any manual Git config command before checking for updates.
+
+### Database
+
+- Global Doki schema remains at version 17.
+- No destructive database migration is declared.
+
+### Destructive Changes
+
+- None declared.
+
 ## 1.2.2 - 2026-06-08
 
 Fixes updater Git safety handling for Docker-mounted workspaces.

@@ -169,6 +169,12 @@ def git_or_raise(args, timeout=60):
     return run_or_raise(git_command(args), timeout=timeout)
 
 
+def ensure_git_safe_directory():
+    existing = command_result(["git", "config", "--global", "--get-all", "safe.directory"], timeout=10)
+    if str(REPO_ROOT) not in existing.get("output", "").splitlines():
+        command_result(["git", "config", "--global", "--add", "safe.directory", str(REPO_ROOT)], timeout=10)
+
+
 def parse_semver_tag(tag):
     match = SEMVER_RE.match(tag.strip())
     if not match:
@@ -1088,6 +1094,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    ensure_git_safe_directory()
     ensure_parent(STATE_FILE)
     ensure_parent(TOKEN_FILE)
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
