@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "product": "doki",
-  "currentVersion": "1.2.0",
+  "currentVersion": "1.2.1",
   "fallbackVersion": "1.0.0",
   "source": {
     "type": "git",
@@ -10,9 +10,47 @@
   },
   "releases": [
     {
+      "version": "1.2.1",
+      "tag": "v1.2.1",
+      "status": "current",
+      "channel": "stable",
+      "baseVersion": "1.2.0",
+      "commit": null,
+      "releasedAt": "2026-06-08T18:44:35+02:00",
+      "schemaVersion": 17,
+      "summary": "Patch release for exercising the Doki stable updater flow.",
+      "requirements": {
+        "requiresRestart": true,
+        "requiresRebuild": false,
+        "requiresSetupCheck": false
+      },
+      "risk": {
+        "destructive": false,
+        "destructiveChanges": [],
+        "databaseMigrations": [
+          {
+            "scope": "global",
+            "from": 17,
+            "to": 17,
+            "summary": "No global Doki schema migration.",
+            "destructive": false
+          }
+        ]
+      },
+      "changes": [
+        "Bumps Doki to 1.2.1 so installations on 1.2.0 can perform a real stable-tag update.",
+        "Keeps database schema unchanged at version 17.",
+        "Declares no destructive changes."
+      ],
+      "operatorNotes": [
+        "Use this release to verify check, migration dry-run, backup, checkout, and restart stages from the Updates page.",
+        "No destructive changes are declared for this release."
+      ]
+    },
+    {
       "version": "1.2.0",
       "tag": "v1.2.0",
-      "status": "current",
+      "status": "stable",
       "channel": "stable",
       "baseVersion": "1.1.0",
       "commit": null,

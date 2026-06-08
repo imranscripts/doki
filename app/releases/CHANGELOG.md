@@ -1,5 +1,23 @@
 # Doki Changelog
 
+## 1.2.1 - 2026-06-08
+
+Patch release for exercising the Doki stable updater flow.
+
+### Changed
+
+- Bumped Doki to `1.2.1` so installations on `1.2.0` can perform a real stable-tag update.
+- Kept the database schema unchanged at version 17.
+
+### Database
+
+- Global Doki schema remains at version 17.
+- No destructive database migration is declared.
+
+### Destructive Changes
+
+- None declared.
+
 ## 1.2.0 - 2026-06-08
 
 Adds Doki's stable-tag update flow.
